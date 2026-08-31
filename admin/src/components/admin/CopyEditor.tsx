@@ -1,7 +1,8 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useMarketConfig } from './useMarketConfig'
 import AIToggle from './AIToggle'
 import SaveBar from './SaveBar'
+import VersionHistoryPanel from './VersionHistoryPanel'
 
 interface CopyEditorProps {
   market: string
@@ -15,8 +16,9 @@ const inputClass =
   'w-full rounded border border-gray-700 bg-gray-800 px-3 py-2 text-gray-100 outline-none focus:border-indigo-500'
 
 export default function CopyEditor({ market, onDirtyChange }: CopyEditorProps) {
-  const { config, loading, saving, error, isDirty, fetchConfig, setField, saveConfig, reset } =
+  const { config, loading, saving, error, isDirty, fetchConfig, setField, saveConfig, reset, applyRestoredConfig } =
     useMarketConfig(market)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   useEffect(() => {
     onDirtyChange?.(isDirty)
@@ -52,11 +54,21 @@ export default function CopyEditor({ market, onDirtyChange }: CopyEditorProps) {
       <div className="flex-1 overflow-y-auto p-6">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-gray-100">{market.toUpperCase()} — Copy</h1>
-          {isDirty && (
-            <button type="button" onClick={reset} className="text-sm text-gray-400 underline hover:text-gray-200">
-              Discard changes
+          <div className="flex items-center gap-4">
+            {isDirty && (
+              <button type="button" onClick={reset} className="text-sm text-gray-400 underline hover:text-gray-200">
+                Discard changes
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(true)}
+              className="flex items-center gap-1.5 rounded border border-gray-700 px-3 py-1.5 text-sm text-gray-300 transition-colors hover:bg-gray-800"
+            >
+              <ClockIcon />
+              History
             </button>
-          )}
+          </div>
         </div>
 
         <div className="max-w-2xl space-y-5">
@@ -119,7 +131,32 @@ export default function CopyEditor({ market, onDirtyChange }: CopyEditorProps) {
       </div>
 
       <SaveBar isDirty={isDirty} saving={saving} error={error} onSave={() => saveConfig()} />
+
+      <VersionHistoryPanel
+        market={market}
+        isOpen={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        onRestoreSuccess={applyRestoredConfig}
+      />
     </div>
+  )
+}
+
+function ClockIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 3" />
+    </svg>
   )
 }
 

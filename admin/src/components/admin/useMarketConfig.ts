@@ -12,6 +12,9 @@ export interface MarketConfig {
   emailNotifications: boolean
   updatedAt: string
   updatedBy: string
+  // Set only by a rollback (see VersionHistoryPanel) — mirrors
+  // worker/src/routes/admin.ts's MarketConfig.
+  restoredFrom?: string
 }
 
 export type MarketConfigField =
@@ -102,6 +105,16 @@ export function useMarketConfig(market: string) {
     setDraft(saved)
   }, [saved])
 
+  // For VersionHistoryPanel's restore flow: the rollback already happened
+  // server-side (POST /config/:market/rollback), so this just adopts the
+  // result as both `saved` and `draft` — the form comes back clean, not
+  // dirty, since there's nothing left to save.
+  const applyRestoredConfig = useCallback((config: MarketConfig) => {
+    setSaved(config)
+    setDraft(config)
+    setError(null)
+  }, [])
+
   const saveConfig = useCallback(
     async (partial?: Partial<EditablePatch>): Promise<MarketConfig | undefined> => {
       if (!draft) return undefined
@@ -142,5 +155,6 @@ export function useMarketConfig(market: string) {
     setField,
     saveConfig,
     reset,
+    applyRestoredConfig,
   }
 }

@@ -49,7 +49,13 @@ export interface MarketConfig {
   emailNotifications: boolean
   updatedAt: string
   updatedBy: string
+  // Set only by POST /config/:market/rollback (Phase 3 Part 2) — the
+  // timestamp of the version it was restored from. Not one of the
+  // PUT-editable fields, so a normal save just carries it forward unchanged.
+  restoredFrom?: string
 }
+
+const MARKET_SLUG_RE = /^[a-z0-9-]+$/
 
 type MarketConfigPatch = Partial<
   Pick<
@@ -130,12 +136,116 @@ admin.get('/config/:market/versions', async (c) => {
   const prefix = versionPrefix(market)
   const list = await c.env.KV.list({ prefix })
 
-  const versions = list.keys
+  const sorted = list.keys
     .map((k) => ({ key: k.name, timestamp: Number(k.name.slice(prefix.length)) }))
     .sort((a, b) => b.timestamp - a.timestamp)
     .slice(0, 20)
 
+  // Part 2's VersionHistoryPanel shows "updated by" per row in the
+  // collapsed list, not just the expanded preview — that needs each
+  // snapshot's body, not just its key. Parallelized, so this stays one
+  // round-trip's worth of latency regardless of how many entries there are.
+  const versions = await Promise.all(
+    sorted.map(async (v) => {
+      const snapshot = await c.env.KV.get<MarketConfig>(v.key, 'json')
+      return { ...v, updatedBy: snapshot?.updatedBy ?? 'unknown' }
+    })
+  )
+
   return c.json({ versions })
+})
+
+// GET /api/admin/config/:market/versions/:timestamp
+admin.get('/config/:market/versions/:timestamp', async (c) => {
+  const market = c.req.param('market')
+  const timestamp = c.req.param('timestamp')
+  const config = await c.env.KV.get<MarketConfig>(`${versionPrefix(market)}${timestamp}`, 'json')
+  if (!config) return c.json({ error: 'Version not found' }, 404)
+  return c.json(config)
+})
+
+// POST /api/admin/config/:market/clone
+admin.post('/config/:market/clone', async (c) => {
+  const sourceMarket = c.req.param('market')
+
+  let body: { targetMarket?: string }
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400)
+  }
+
+  const targetMarket = body.targetMarket ?? ''
+  if (!MARKET_SLUG_RE.test(targetMarket)) {
+    return c.json({ error: 'Invalid market slug. Use lowercase letters, numbers, and hyphens only.' }, 400)
+  }
+
+  const sourceConfig = await c.env.KV.get<MarketConfig>(configKey(sourceMarket), 'json')
+  if (!sourceConfig) return c.json({ error: 'Market not found' }, 404)
+
+  const index = (await c.env.KV.get<string[]>(MARKETS_INDEX_KEY, 'json')) ?? []
+  if (index.includes(targetMarket)) {
+    return c.json({ error: `Market '${targetMarket}' already exists.` }, 409)
+  }
+
+  const jwt = c.get('jwtPayload')
+  const cloned: MarketConfig = {
+    ...sourceConfig,
+    market: targetMarket,
+    updatedAt: new Date().toISOString(),
+    updatedBy: jwt.email,
+  }
+
+  await c.env.KV.put(configKey(targetMarket), JSON.stringify(cloned))
+  await c.env.KV.put(MARKETS_INDEX_KEY, JSON.stringify([...index, targetMarket]))
+  // Initial snapshot for the new market, same "every save gets a version"
+  // convention the PUT handler follows above.
+  await c.env.KV.put(`${versionPrefix(targetMarket)}${Date.now()}`, JSON.stringify(cloned))
+
+  return c.json({ success: true, config: cloned })
+})
+
+// POST /api/admin/config/:market/rollback
+admin.post('/config/:market/rollback', async (c) => {
+  const market = c.req.param('market')
+
+  let body: { timestamp?: string }
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400)
+  }
+  if (!body.timestamp) return c.json({ error: 'timestamp is required' }, 400)
+
+  const versionConfig = await c.env.KV.get<MarketConfig>(
+    `${versionPrefix(market)}${body.timestamp}`,
+    'json'
+  )
+  if (!versionConfig) return c.json({ error: 'Version not found' }, 404)
+
+  // Snapshot the pre-rollback state before overwriting it — like an undo
+  // stack: rolling back to an old version creates a brand-new version
+  // first, so the rollback itself can always be undone by rolling back
+  // again. Skipped only if there's no current config at all to preserve
+  // (a market with version history but a since-deleted current config —
+  // not a reason to fail the rollback).
+  const currentConfig = await c.env.KV.get<MarketConfig>(configKey(market), 'json')
+  if (currentConfig) {
+    await c.env.KV.put(`${versionPrefix(market)}${Date.now()}`, JSON.stringify(currentConfig))
+  }
+
+  const jwt = c.get('jwtPayload')
+  const restored: MarketConfig = {
+    ...versionConfig,
+    market,
+    updatedAt: new Date().toISOString(),
+    updatedBy: jwt.email,
+    restoredFrom: body.timestamp,
+  }
+
+  await c.env.KV.put(configKey(market), JSON.stringify(restored))
+
+  return c.json({ success: true, config: restored })
 })
 
 export default admin

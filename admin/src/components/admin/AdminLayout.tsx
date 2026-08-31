@@ -6,6 +6,7 @@ interface AdminLayoutProps {
   dirtyMarket: string | null
   onSelectMarket: (market: string) => void
   onMarketsLoaded: (markets: string[]) => void
+  onCloneSuccess: (newMarket: string) => void
   userEmail: string | null
   onLogout: () => void
   children: ReactNode
@@ -16,6 +17,7 @@ export default function AdminLayout({
   dirtyMarket,
   onSelectMarket,
   onMarketsLoaded,
+  onCloneSuccess,
   userEmail,
   onLogout,
   children,
@@ -67,6 +69,7 @@ export default function AdminLayout({
             dirtyMarket={dirtyMarket}
             onSelect={selectAndClose}
             onMarketsLoaded={onMarketsLoaded}
+            onCloneSuccess={onCloneSuccess}
           />
         </aside>
 

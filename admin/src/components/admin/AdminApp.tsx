@@ -73,6 +73,10 @@ export default function AdminApp() {
       dirtyMarket={dirtyMarket}
       onSelectMarket={handleSelectMarket}
       onMarketsLoaded={handleMarketsLoaded}
+      // Cloning a market and navigating to it are the same operation as
+      // clicking it in the sidebar once it exists — reuse handleSelectMarket
+      // rather than duplicating the URL-param bookkeeping.
+      onCloneSuccess={handleSelectMarket}
       userEmail={user?.email ?? null}
       onLogout={clearSession}
     >
