@@ -9,6 +9,21 @@
 # binding under a `[env.production]` block once a production KV namespace
 # exists, or once page copy is served from the same KV as the Worker's
 # production namespace (e4a5bf2e70054fadadc41e4cdb968cd7).
+#
+# KNOWN ISSUE — `wrangler pages deploy` currently fails here with
+# "The name 'ASSETS' is reserved in Pages projects." This is an upstream
+# @astrojs/cloudflare bug (SSR + Pages), not a config error in this repo:
+# https://github.com/withastro/astro/issues/16107
+# The adapter auto-generates a Pages Functions worker with an `ASSETS`
+# binding for any route that needs SSR (e.g. src/pages/site/[subdomain]),
+# and Pages now reserves that binding name. `output: 'static'` in
+# astro.config.mjs does NOT work around it — it only avoids the bug once
+# the whole project has zero SSR routes, which this one doesn't (the
+# subdomain renderer does real per-request KV lookups and can't be
+# prerendered). Confirmed 2026-08-31: pinning @astrojs/cloudflare back to
+# the last pre-bug release (12.6.13) isn't a safe fix either — it requires
+# astro ^5.7.0, two majors behind this project's astro@7.
+# Revisit once upstream ships a fix, and remove this note then.
 
 name = "landingpagebuild-astro-staging"
 compatibility_date = "2024-09-23"
