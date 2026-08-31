@@ -12,25 +12,49 @@ const leads = new Hono<AppContext>()
 // parallel schemas (this D1 table + a separate leads:{market}:{timestamp}
 // KV log) that existed before this pass.
 //
-// Whitelisted against the real base domain rather than blacklisting known
+// Whitelisted against the real base domains rather than blacklisting known
 // non-market hosting suffixes one at a time — an earlier version excluded
 // only *.pages.dev and missed that requests hitting the Worker directly in
 // staging arrive on *.workers.dev, which parsed as a bogus "market"
 // (caught by testing the actual deployed endpoint, not just the brief's
 // example hosts). A bare root domain, a Workers/Pages hosting hostname, or
-// anything else that isn't a real "{market}.landingpagebuild.com" has no
-// market subdomain, hence "default".
-const BASE_DOMAIN = 'landingpagebuild.com'
+// anything else that isn't a real "{market}.<base domain>" has no market
+// subdomain, hence "default".
+//
+// landingpagbuild.com (missing the second 'e') is the staging domain the
+// Astro site's market pages actually serve on as of Phase 4 (see
+// astro/src/lib/marketConfig.ts, which mirrors this list) — added here too
+// so a lead submitted from e.g. uk.landingpagbuild.com resolves to market
+// "uk" instead of silently falling back to "default".
+const BASE_DOMAINS = ['landingpagbuild.com', 'landingpagebuild.com']
 
-function deriveMarketAndSubdomain(host: string | undefined): { market: string; subdomain: string } {
-  if (!host) return { market: 'default', subdomain: '' }
-  if (host === BASE_DOMAIN || !host.endsWith(`.${BASE_DOMAIN}`)) {
-    return { market: 'default', subdomain: host }
+function hostFromUrl(value: string | undefined): string | undefined {
+  if (!value) return undefined
+  try {
+    return new URL(value).host
+  } catch {
+    return undefined
   }
-  const prefix = host.slice(0, host.length - BASE_DOMAIN.length - 1)
-  // A nested prefix (e.g. "staging" is fine, "foo.bar" isn't a market
-  // slug) falls back to "default" too, rather than guessing.
-  return { market: prefix.includes('.') ? 'default' : prefix, subdomain: host }
+}
+
+// The real call path this serves is the market landing page's client-side
+// JS (LeadForm) fetching THIS Worker's own domain — a cross-origin
+// request. On that request, `Host` is this Worker's own hostname, never
+// the calling page's; it's `Origin` (and, as a fallback, `Referer`) that
+// actually carries the page's domain for a cross-origin browser fetch.
+// `Host` is still checked last, for a same-origin or non-browser caller
+// with no Origin/Referer at all. Takes candidate hosts in priority order.
+function deriveMarketAndSubdomain(candidateHosts: (string | undefined)[]): { market: string; subdomain: string } {
+  for (const host of candidateHosts) {
+    if (!host) continue
+    const base = BASE_DOMAINS.find((b) => host.endsWith(`.${b}`))
+    if (!base) continue
+    const prefix = host.slice(0, host.length - base.length - 1)
+    // A nested prefix (e.g. "staging" is fine, "foo.bar" isn't a market
+    // slug) falls back to "default" too, rather than guessing.
+    return { market: prefix.includes('.') ? 'default' : prefix, subdomain: host }
+  }
+  return { market: 'default', subdomain: candidateHosts.find((h) => h) ?? '' }
 }
 
 // POST /websites/:websiteId/leads — public, no auth required
@@ -57,7 +81,11 @@ leads.post('/', async (c) => {
   const id = generateId()
   const timestamp = now()
   const sourceUrl = c.req.header('Referer') ?? null
-  const { market, subdomain } = deriveMarketAndSubdomain(c.req.header('Host'))
+  const { market, subdomain } = deriveMarketAndSubdomain([
+    hostFromUrl(c.req.header('Origin')),
+    hostFromUrl(c.req.header('Referer')),
+    c.req.header('Host'),
+  ])
 
   await c.env.DB.prepare(
     `INSERT INTO leads (id, website_id, page_id, market, subdomain, name, email, message, source_url, metadata, ai_summary, submitted_at, created_at)

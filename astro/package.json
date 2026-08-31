@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "wrangler pages dev dist",
-    "deploy": "astro build && wrangler pages deploy dist --project-name=landingpagebuild-astro-staging",
+    "preview": "wrangler dev dist/server/entry.mjs --assets=dist/client --config wrangler.toml",
+    "deploy": "astro build && wrangler deploy dist/server/entry.mjs --assets=dist/client --config wrangler.toml",
     "type-check": "astro check"
   },
   "dependencies": {

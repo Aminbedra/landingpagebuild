@@ -2,7 +2,11 @@ import { useState, type SyntheticEvent } from 'react'
 import { submitLead } from '../lib/api'
 
 interface LeadFormProps {
-  websiteId: string
+  // Optional: a market landing page (see astro/src/pages/index.astro) has
+  // no associated website record, so there's nothing to pass — the form
+  // renders nothing rather than submit to a broken /websites/undefined/
+  // leads URL. Real market-scoped lead capture is separate, undone work.
+  websiteId?: string
   apiUrl: string
   pageId?: string
 }
@@ -16,6 +20,12 @@ export default function LeadForm({ websiteId, apiUrl, pageId }: LeadFormProps) {
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState<string | null>(null)
 
+  if (!websiteId) return null
+  // TS doesn't narrow `websiteId` inside a hoisted function declaration
+  // captured after the guard above — rebind it as a definitely-string
+  // const instead of sprinkling non-null assertions below.
+  const ownerWebsiteId = websiteId
+
   async function handleSubmit(e: SyntheticEvent) {
     e.preventDefault()
     if (!name.trim() && !email.trim()) {
@@ -26,7 +36,7 @@ export default function LeadForm({ websiteId, apiUrl, pageId }: LeadFormProps) {
     setStatus('sending')
     setError(null)
     try {
-      await submitLead(apiUrl, websiteId, { name, email, message, page_id: pageId })
+      await submitLead(apiUrl, ownerWebsiteId, { name, email, message, page_id: pageId })
       setStatus('sent')
       setName('')
       setEmail('')

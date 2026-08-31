@@ -2,7 +2,12 @@ import { useEffect, useRef, useState, type SyntheticEvent } from 'react'
 import { sendChatMessage, type ChatMessage } from '../lib/api'
 
 interface ChatWidgetProps {
-  websiteId: string
+  // Optional: a market landing page (see astro/src/pages/index.astro) has
+  // no associated website record, so there's nothing to chat against —
+  // the widget renders nothing rather than a chat bubble that can't
+  // actually send anything. Real market-scoped AI chat is separate,
+  // undone work.
+  websiteId?: string
   apiUrl: string
   pageId?: string
   /** Owner JWT — required until a visitor-safe chat endpoint exists. See lib/api.ts. */
@@ -21,6 +26,11 @@ export default function ChatWidget({ websiteId, apiUrl, pageId, authToken }: Cha
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, open])
 
+  if (!websiteId) return null
+  // Same reason as LeadForm.tsx: TS doesn't narrow `websiteId` inside a
+  // hoisted function declaration captured after the guard above.
+  const chatWebsiteId = websiteId
+
   async function handleSend(e: SyntheticEvent) {
     e.preventDefault()
     const text = input.trim()
@@ -34,7 +44,7 @@ export default function ChatWidget({ websiteId, apiUrl, pageId, authToken }: Cha
     setError(null)
 
     try {
-      const data = await sendChatMessage(apiUrl, websiteId, {
+      const data = await sendChatMessage(apiUrl, chatWebsiteId, {
         message: text,
         pageId,
         history,
