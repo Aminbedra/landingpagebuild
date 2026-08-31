@@ -103,8 +103,23 @@ export interface AuthenticatedUser {
   role: UserRole
 }
 
-// Shared by /auth/login (routes/auth.ts) and /api/admin/login
-// (routes/adminAuth.ts) so the password-hashing scheme lives in one place.
+// Shared by /auth/register, /auth/login, and POST /api/admin/users
+// (routes/adminUsers.ts) so there's one password-hashing implementation
+// instead of three. Always normalizes the email first — register used to
+// hash against the raw (possibly mixed-case) email while login/
+// verifyCredentials hashed against the lowercased one, which would have
+// silently broken login for any account registered with a mixed-case
+// email. Fixed by consolidating here.
+export async function hashPassword(password: string, email: string): Promise<string> {
+  const hash = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(password + email.toLowerCase())
+  )
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
 export async function verifyCredentials(
   env: Env,
   email: string,
@@ -117,14 +132,7 @@ export async function verifyCredentials(
   ).bind(normalizedEmail).first<AuthenticatedUser>()
   if (!user) return null
 
-  const hash = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(password + normalizedEmail)
-  )
-  const passwordHash = Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
-
+  const passwordHash = await hashPassword(password, normalizedEmail)
   const storedHash = await env.SESSIONS.get(`pw:${user.id}`)
   if (storedHash !== passwordHash) return null
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout'
 import CopyEditor from './CopyEditor'
 import LeadsDashboard from './LeadsDashboard'
+import UsersPanel from './UsersPanel'
 import LoginGate from './LoginGate'
 import type { AdminView } from './MarketSidebar'
 import { useAdminSession } from './useAdminSession'
@@ -17,7 +18,8 @@ function readMarketFromUrl(): string | null {
 
 function readViewFromUrl(): AdminView {
   if (typeof window === 'undefined') return 'copy'
-  return new URLSearchParams(window.location.search).get('view') === 'leads' ? 'leads' : 'copy'
+  const v = new URLSearchParams(window.location.search).get('view')
+  return v === 'leads' || v === 'users' ? v : 'copy'
 }
 
 export default function AdminApp() {
@@ -57,11 +59,16 @@ export default function AdminApp() {
     })
   }, [])
 
-  const handleNavigate = useCallback((market: string, nextView: AdminView) => {
+  // `market` is nullable because 'users' is account-scoped, not
+  // market-scoped — navigating there doesn't require (or change) a market
+  // selection. When one was already set, it's preserved in the URL so
+  // going back to Copy/Leads lands where the user left off.
+  const handleNavigate = useCallback((market: string | null, nextView: AdminView) => {
     setSelectedMarket(market)
     setView(nextView)
     const url = new URL(window.location.href)
-    url.searchParams.set('market', market)
+    if (market) url.searchParams.set('market', market)
+    else url.searchParams.delete('market')
     url.searchParams.set('view', nextView)
     window.history.pushState({}, '', url)
   }, [])
@@ -98,7 +105,11 @@ export default function AdminApp() {
       userEmail={user?.email ?? null}
       onLogout={clearSession}
     >
-      {selectedMarket ? (
+      {view === 'users' ? (
+        // Account-scoped: rendered regardless of whether a market is
+        // selected, unlike the copy/leads branches below.
+        <UsersPanel />
+      ) : selectedMarket ? (
         view === 'leads' ? (
           // key remounts on market change (and here, matches CopyEditor's
           // pattern) so useLeads' internal state doesn't leak between

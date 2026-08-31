@@ -9,6 +9,7 @@ import versionRoutes from './routes/versions'
 import aiRoutes from './routes/ai'
 import adminRoutes from './routes/admin'
 import adminAuthRoutes from './routes/adminAuth'
+import adminUsersRoutes from './routes/adminUsers'
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -49,6 +50,13 @@ app.route('/websites', websiteRoutes)
 // the unprotected POST /api/admin/login has to be mounted first or that
 // middleware would intercept it too.
 app.route('/api/admin', adminAuthRoutes)
+// adminUsersRoutes must be mounted before adminRoutes for the same reason
+// as above: adminRoutes applies requireSuperAdmin to '*' at the broader
+// /api/admin prefix, and Hono matches in registration order — mounting it
+// first would risk intercepting /api/admin/users/* before this router's
+// own (identical) guard ever runs, or 404ing if admin.ts's dispatch
+// swallows the request first.
+app.route('/api/admin/users', adminUsersRoutes)
 app.route('/api/admin', adminRoutes)
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────

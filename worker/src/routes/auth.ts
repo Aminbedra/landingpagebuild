@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Env } from '../types'
-import { signJwt, verifyJwt, extractToken, verifyCredentials } from '../lib/auth'
+import { signJwt, verifyJwt, extractToken, verifyCredentials, hashPassword } from '../lib/auth'
 import { generateId, ok, err, now } from '../lib/utils'
 
 const auth = new Hono<{ Bindings: Env }>()
@@ -21,13 +21,7 @@ auth.post('/register', async (c) => {
   if (existing) return err('Email already registered', 409)
 
   // Hash password — using SHA-256 for now, upgrade to bcrypt via external API in prod
-  const hash = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(body.password + body.email)
-  )
-  const passwordHash = Array.from(new Uint8Array(hash))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('')
+  const passwordHash = await hashPassword(body.password, body.email)
 
   const id = generateId()
   const timestamp = now()

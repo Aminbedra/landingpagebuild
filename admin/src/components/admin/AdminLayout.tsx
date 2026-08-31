@@ -6,7 +6,7 @@ interface AdminLayoutProps {
   view: AdminView
   dirtyMarket: string | null
   leadCounts: Record<string, number>
-  onNavigate: (market: string, view: AdminView) => void
+  onNavigate: (market: string | null, view: AdminView) => void
   onMarketsLoaded: (markets: string[]) => void
   onCloneSuccess: (newMarket: string) => void
   userEmail: string | null
@@ -28,7 +28,7 @@ export default function AdminLayout({
 }: AdminLayoutProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
-  function navigateAndClose(market: string, nextView: AdminView) {
+  function navigateAndClose(market: string | null, nextView: AdminView) {
     onNavigate(market, nextView)
     setMobileNavOpen(false)
   }
@@ -64,23 +64,60 @@ export default function AdminLayout({
         )}
 
         <aside
-          className={`absolute inset-y-0 left-0 z-20 w-64 transform border-r border-gray-700 bg-gray-900 transition-transform duration-200 md:relative md:z-auto md:w-56 md:translate-x-0 ${
+          className={`absolute inset-y-0 left-0 z-20 flex w-64 transform flex-col border-r border-gray-700 bg-gray-900 transition-transform duration-200 md:relative md:z-auto md:w-56 md:translate-x-0 ${
             mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <MarketSidebar
-            selectedMarket={selectedMarket}
-            view={view}
-            dirtyMarket={dirtyMarket}
-            leadCounts={leadCounts}
-            onNavigate={navigateAndClose}
-            onMarketsLoaded={onMarketsLoaded}
-            onCloneSuccess={onCloneSuccess}
-          />
+          {/* Account-scoped, not market-scoped — lives outside
+              MarketSidebar on purpose, which stays focused on markets. */}
+          <div className="shrink-0 border-b border-gray-700 p-3">
+            <button
+              type="button"
+              onClick={() => navigateAndClose(selectedMarket, 'users')}
+              aria-current={view === 'users' ? 'page' : undefined}
+              className={`flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm font-medium transition-colors ${
+                view === 'users' ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800'
+              }`}
+            >
+              <UsersIcon />
+              Users
+            </button>
+          </div>
+
+          <div className="min-h-0 flex-1">
+            <MarketSidebar
+              selectedMarket={selectedMarket}
+              view={view}
+              dirtyMarket={dirtyMarket}
+              leadCounts={leadCounts}
+              onNavigate={navigateAndClose}
+              onMarketsLoaded={onMarketsLoaded}
+              onCloneSuccess={onCloneSuccess}
+            />
+          </div>
         </aside>
 
         <main className="min-w-0 flex-1 overflow-hidden bg-gray-950">{children}</main>
       </div>
     </div>
+  )
+}
+
+function UsersIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
   )
 }

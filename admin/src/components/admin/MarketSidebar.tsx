@@ -2,14 +2,16 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { adminFetch } from '../../lib/adminAuth'
 import CloneMarketModal from './CloneMarketModal'
 
-export type AdminView = 'copy' | 'leads'
+// 'users' is account-scoped, not market-scoped — see AdminLayout, which
+// renders that nav item itself rather than inside this component.
+export type AdminView = 'copy' | 'leads' | 'users'
 
 interface MarketSidebarProps {
   selectedMarket: string | null
   view: AdminView
   dirtyMarket: string | null
   leadCounts: Record<string, number>
-  onNavigate: (market: string, view: AdminView) => void
+  onNavigate: (market: string | null, view: AdminView) => void
   onMarketsLoaded: (markets: string[]) => void
   onCloneSuccess: (newMarket: string) => void
 }
