@@ -1,17 +1,66 @@
 ---
+// Market-aware landing page (Phase 4) — one template, many markets.
+// Derives the market from the Host header at request time and renders
+// whatever the admin panel (Phase 3) last saved to config:{market} in KV.
+//
+// Deliberately does NOT touch site/[subdomain]/[...slug].astro — that
+// route's own header comment says its content model stays the same
+// through Phase 4 (only the routing layer was meant to change, from
+// path-based to real subdomains). It serves a different, still-
+// unpopulated schema (page:{subdomain}:{slug}, structured sections
+// nothing has ever written) that predates the admin panel. This page
+// serves what the admin panel actually manages instead: config:{market}.
+//
+// No LeadForm/ChatWidget island here — both require a real `websiteId`
+// (LeadForm/ChatWidget.tsx have no `aiEnabled` prop and no
+// website-optional path either), and a market has no associated website
+// record by design (see worker/src/routes/admin.ts's top-of-file note).
+// Wiring lead capture and the AI widget to markets is real, undocumented
+// scope beyond "derive market from Host and render KV config" — see the
+// write-up delivered alongside this change.
+export const prerender = false
+
+import { env } from 'cloudflare:workers'
 import Layout from '../layouts/Layout.astro'
+import { marketFromHost, getMarketConfig } from '../lib/marketConfig'
+
+const host = Astro.request.headers.get('host')
+const market = marketFromHost(host)
+const config = await getMarketConfig(env.KV, market)
+
+const headline = config?.headline ?? 'Welcome'
+const subheadline = config?.subheadline ?? ''
+const body = config?.body ?? ''
+const ctaText = config?.ctaText ?? 'Get started'
+const ctaUrl = config?.ctaUrl ?? '#'
+const aiEnabled = config?.aiEnabled ?? false
 ---
 
-<Layout title="LandingPageBuild — Astro renderer">
-  <main class="mx-auto max-w-2xl px-6 py-24">
-    <h1 class="text-3xl font-bold text-slate-900">Astro SSR renderer</h1>
-    <p class="mt-4 text-slate-600">
-      Published pages render at <code class="rounded bg-slate-100 px-1.5 py-0.5 text-sm">/site/[subdomain]/[slug]</code>,
-      pulling page copy from Workers KV at request time. Real subdomain-based routing (e.g. acme.landingpagebuild.com)
-      lands in Phase 4 — this path-based route exists for local/staging testing until then.
-    </p>
-    <p class="mt-4">
-      <a class="font-medium text-slate-900 underline" href="/site/demo/index">View the demo page →</a>
-    </p>
+<Layout title={`${headline} — LandingPageBuild`} description={subheadline || undefined}>
+  <main class="mx-auto max-w-3xl px-6 py-24">
+    <p class="text-sm font-medium tracking-wide text-slate-500 uppercase">{market.toUpperCase()}</p>
+    <h1 class="mt-2 text-4xl font-bold text-slate-900">{headline}</h1>
+    {subheadline && <p class="mt-4 text-lg text-slate-600">{subheadline}</p>}
+    {body && <p class="mt-6 whitespace-pre-wrap text-slate-700">{body}</p>}
+    <a
+      href={ctaUrl}
+      class="mt-8 inline-block rounded-lg bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+    >
+      {ctaText}
+    </a>
+    {
+      !config && (
+        <p class="mt-6 text-sm text-amber-600">
+          No saved copy for market &ldquo;{market}&rdquo; yet — showing placeholder content.
+        </p>
+      )
+    }
+    {
+      aiEnabled && (
+        <p class="mt-2 text-xs text-slate-400" data-ai-enabled="true">
+          AI Pitch Widget is enabled for this market (no visitor-facing widget wired up yet — see write-up).
+        </p>
+      )
+    }
   </main>
 </Layout>
