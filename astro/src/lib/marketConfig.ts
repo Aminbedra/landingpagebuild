@@ -17,6 +17,8 @@ export interface MarketConfig {
   emailNotifications: boolean
   // Phase 6 — set via the admin panel's Media Library "Set as hero" action.
   heroImageUrl?: string
+  // Phase 8 — preset id from lib/presets.ts; absent means 'classic'.
+  stylePreset?: string
   updatedAt: string
   updatedBy: string
   restoredFrom?: string

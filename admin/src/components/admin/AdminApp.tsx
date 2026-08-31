@@ -5,8 +5,10 @@ import LeadsDashboard from './LeadsDashboard'
 import UsersPanel from './UsersPanel'
 import MediaLibrary from './MediaLibrary'
 import AnalyticsPanel from './AnalyticsPanel'
+import PresetsPanel from './PresetsPanel'
 import LoginGate from './LoginGate'
 import type { AdminView } from './MarketSidebar'
+import type { CopyTemplate } from './useCopyTemplates'
 import { useAdminSession } from './useAdminSession'
 import { useIdleSessionRefresh } from './useIdleSessionRefresh'
 import { clearSession } from '../../lib/adminAuth'
@@ -21,7 +23,7 @@ function readMarketFromUrl(): string | null {
 function readViewFromUrl(): AdminView {
   if (typeof window === 'undefined') return 'copy'
   const v = new URLSearchParams(window.location.search).get('view')
-  return v === 'leads' || v === 'users' || v === 'media' || v === 'analytics' ? v : 'copy'
+  return v === 'leads' || v === 'users' || v === 'media' || v === 'analytics' || v === 'presets' ? v : 'copy'
 }
 
 export default function AdminApp() {
@@ -32,6 +34,11 @@ export default function AdminApp() {
   const [view, setView] = useState<AdminView>(() => readViewFromUrl())
   const [dirtyMarket, setDirtyMarket] = useState<string | null>(null)
   const [leadCounts, setLeadCounts] = useState<Record<string, number>>({})
+  // Phase 8 — set by PresetsPanel's "Use this template", consumed by
+  // CopyEditor once it mounts for the matching market. The market check
+  // on read guards against a stale template surviving a later, unrelated
+  // navigation to the Copy tab for a different market.
+  const [pendingTemplate, setPendingTemplate] = useState<{ market: string; template: CopyTemplate } | null>(null)
 
   // Keep selection in sync with browser back/forward.
   useEffect(() => {
@@ -75,6 +82,17 @@ export default function AdminApp() {
     window.history.pushState({}, '', url)
   }, [])
 
+  // PresetsPanel calls this from "Use this template" — hands the template
+  // off via state (CopyEditor picks it up once its config has loaded) and
+  // navigates there, reusing the same market/view routing as any other nav.
+  const handleUseTemplate = useCallback(
+    (market: string, template: CopyTemplate) => {
+      setPendingTemplate({ market, template })
+      handleNavigate(market, 'copy')
+    },
+    [handleNavigate]
+  )
+
   const handleDirtyChange = useCallback(
     (dirty: boolean) => {
       setDirtyMarket((current) => {
@@ -115,6 +133,8 @@ export default function AdminApp() {
         <MediaLibrary />
       ) : view === 'analytics' ? (
         <AnalyticsPanel />
+      ) : view === 'presets' ? (
+        <PresetsPanel onUseTemplate={handleUseTemplate} />
       ) : selectedMarket ? (
         view === 'leads' ? (
           // key remounts on market change (and here, matches CopyEditor's
@@ -122,7 +142,13 @@ export default function AdminApp() {
           // markets.
           <LeadsDashboard key={`leads-${selectedMarket}`} market={selectedMarket} onTotalLoaded={handleLeadsTotalLoaded} />
         ) : (
-          <CopyEditor key={`copy-${selectedMarket}`} market={selectedMarket} onDirtyChange={handleDirtyChange} />
+          <CopyEditor
+            key={`copy-${selectedMarket}`}
+            market={selectedMarket}
+            onDirtyChange={handleDirtyChange}
+            pendingTemplate={pendingTemplate?.market === selectedMarket ? pendingTemplate.template : null}
+            onTemplateConsumed={() => setPendingTemplate(null)}
+          />
         )
       ) : (
         <div className="flex h-full items-center justify-center text-sm text-gray-400">

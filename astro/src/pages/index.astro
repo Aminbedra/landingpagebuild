@@ -2,6 +2,8 @@
 // Market-aware landing page (Phase 4) — one template, many markets.
 // Derives the market from the Host header at request time and renders
 // whatever the admin panel (Phase 3) last saved to config:{market} in KV.
+// Phase 8 added style presets (colour/font/layout) on top — resolved here
+// from config.stylePreset, same "derive at SSR time" pattern as the copy.
 //
 // Deliberately does NOT touch site/[subdomain]/[...slug].astro — that
 // route's own header comment says its content model stays the same
@@ -10,6 +12,13 @@
 // unpopulated schema (page:{subdomain}:{slug}, structured sections
 // nothing has ever written) that predates the admin panel. This page
 // serves what the admin panel actually manages instead: config:{market}.
+//
+// Doesn't use ../layouts/Layout.astro — that's a shared shell (also used
+// by 404.astro and site/[subdomain]/[...slug].astro) with a fixed light
+// body background/text colour, and this page now needs both to vary per
+// request based on the resolved preset. Writes its own minimal <html>
+// shell instead of bolting preset-awareness onto a component other pages
+// depend on staying simple.
 //
 // No LeadForm/ChatWidget island here — both require a real `websiteId`
 // (LeadForm/ChatWidget.tsx have no `aiEnabled` prop and no
@@ -21,9 +30,9 @@
 export const prerender = false
 
 import { env, waitUntil } from 'cloudflare:workers'
-import Layout from '../layouts/Layout.astro'
 import { marketFromHost, getMarketConfig } from '../lib/marketConfig'
 import { isBotRequest, recordPageview } from '../lib/analytics'
+import { getPreset } from '../lib/presets'
 
 const host = Astro.request.headers.get('host')
 const market = marketFromHost(host)
@@ -44,47 +53,107 @@ const ctaText = config?.ctaText ?? 'Get started'
 const ctaUrl = config?.ctaUrl ?? '#'
 const aiEnabled = config?.aiEnabled ?? false
 const heroImageUrl = config?.heroImageUrl ?? null
+
+// Phase 8 — style preset. getPreset() falls back to 'classic' both when
+// stylePreset is absent (unset markets) and when it's set to an unknown
+// id, so this never renders broken/unstyled.
+const preset = getPreset(config?.stylePreset)
+
+const BORDER_RADIUS_PX: Record<typeof preset.borderRadius, string> = {
+  none: '0px',
+  small: '6px',
+  large: '16px',
+}
+
+const bodyStyle = [
+  `--color-background:${preset.colors.background}`,
+  `--color-surface:${preset.colors.surface}`,
+  `--color-primary:${preset.colors.primary}`,
+  `--color-primary-text:${preset.colors.primaryText}`,
+  `--color-heading:${preset.colors.heading}`,
+  `--color-body:${preset.colors.body}`,
+  `--color-muted:${preset.colors.muted}`,
+  `--color-border:${preset.colors.border}`,
+  `--font-heading:'${preset.fonts.heading}', system-ui, sans-serif`,
+  `--font-body:'${preset.fonts.body}', system-ui, sans-serif`,
+  `--border-radius:${BORDER_RADIUS_PX[preset.borderRadius]}`,
+].join(';')
+
+// Google Fonts' own generated embed links use `+` for spaces in family
+// names, not the `%20` a plain encodeURIComponent() would produce — both
+// are valid URL-encodings and Google's endpoint accepts either, but `+`
+// is what to match if comparing against a link copied from
+// fonts.google.com. Deduplicated so a preset with heading === body font
+// (e.g. Classic, Fresh) only requests it once.
+function fontFamilyParam(name: string): string {
+  return encodeURIComponent(name).replace(/%20/g, '+')
+}
+const fontFamilies = Array.from(new Set([preset.fonts.heading, preset.fonts.body]))
+const googleFontsHref = `https://fonts.googleapis.com/css2?${fontFamilies
+  .map((f) => `family=${fontFamilyParam(f)}:wght@400;500;600;700`)
+  .join('&')}&display=swap`
 ---
 
-<Layout title={`${headline} — LandingPageBuild`} description={subheadline || undefined}>
-  {
-    heroImageUrl && (
-      <div class="hero-image-wrapper">
-        <img src={heroImageUrl} alt={headline} class="hero-image" loading="eager" fetchpriority="high" />
-      </div>
-    )
-  }
-  <main class="mx-auto max-w-3xl px-6 py-24">
-    <p class="text-sm font-medium tracking-wide text-slate-500 uppercase">{market.toUpperCase()}</p>
-    <h1 class="mt-2 text-4xl font-bold text-slate-900">{headline}</h1>
-    {subheadline && <p class="mt-4 text-lg text-slate-600">{subheadline}</p>}
-    {body && <p class="mt-6 whitespace-pre-wrap text-slate-700">{body}</p>}
-    <a
-      href={ctaUrl}
-      class="mt-8 inline-block rounded-lg bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-    >
-      {ctaText}
-    </a>
-    {
-      !config && (
-        <p class="mt-6 text-sm text-amber-600">
-          No saved copy for market &ldquo;{market}&rdquo; yet — showing placeholder content.
-        </p>
-      )
-    }
-    {
-      aiEnabled && (
-        <p class="mt-2 text-xs text-slate-400" data-ai-enabled="true">
-          AI Pitch Widget is enabled for this market (no visitor-facing widget wired up yet — see write-up).
-        </p>
-      )
-    }
-  </main>
-</Layout>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{headline} — LandingPageBuild</title>
+    {subheadline && <meta name="description" content={subheadline} />}
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href={googleFontsHref} rel="stylesheet" />
+  </head>
+  <body style={bodyStyle}>
+    <div class={`page-shell layout-${preset.layout}`}>
+      {
+        heroImageUrl && (
+          <div class="hero-image-wrapper">
+            <img src={heroImageUrl} alt={headline} class="hero-image" loading="eager" fetchpriority="high" />
+          </div>
+        )
+      }
+      <main class="content">
+        <p class="eyebrow">{market.toUpperCase()}</p>
+        <h1 class="headline">{headline}</h1>
+        {subheadline && <p class="subheadline">{subheadline}</p>}
+        {body && <p class="body-copy">{body}</p>}
+        <a href={ctaUrl} class="cta-button">
+          {ctaText}
+        </a>
+        {
+          !config && (
+            <p class="placeholder-notice">
+              No saved copy for market &ldquo;{market}&rdquo; yet — showing placeholder content.
+            </p>
+          )
+        }
+        {
+          aiEnabled && (
+            <p class="ai-notice" data-ai-enabled="true">
+              AI Pitch Widget is enabled for this market (no visitor-facing widget wired up yet — see write-up).
+            </p>
+          )
+        }
+      </main>
+    </div>
+  </body>
+</html>
 
 <style>
-  /* Functional only, not a design system — full-width banner above the
-     copy, capped height so a huge upload doesn't dominate the page. */
+  /* Every colour/font value here is a CSS custom property set on <body>'s
+     inline style above, resolved per request from the market's style
+     preset — nothing in this stylesheet is a hardcoded colour or font. */
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--color-background);
+    color: var(--color-body);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
   .hero-image-wrapper {
     width: 100%;
     max-height: 480px;
@@ -96,5 +165,103 @@ const heroImageUrl = config?.heroImageUrl ?? null
     max-height: 480px;
     object-fit: cover;
     display: block;
+  }
+
+  .content {
+    max-width: 48rem;
+    margin-inline: auto;
+    padding: 6rem 1.5rem;
+  }
+
+  .eyebrow {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+  .headline {
+    margin: 0.5rem 0 0;
+    font-size: 2.25rem;
+    line-height: 1.15;
+    font-weight: 700;
+    font-family: var(--font-heading);
+    color: var(--color-heading);
+  }
+  .subheadline {
+    margin: 1rem 0 0;
+    font-size: 1.125rem;
+    color: var(--color-muted);
+  }
+  .body-copy {
+    margin: 1.5rem 0 0;
+    white-space: pre-wrap;
+    color: var(--color-body);
+  }
+  .cta-button {
+    display: inline-block;
+    margin-top: 2rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--border-radius);
+    background-color: var(--color-primary);
+    color: var(--color-primary-text);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.15s ease;
+  }
+  .cta-button:hover {
+    opacity: 0.9;
+  }
+  .placeholder-notice {
+    margin: 1.5rem 0 0;
+    font-size: 0.875rem;
+    color: var(--color-muted);
+  }
+  .ai-notice {
+    margin: 0.5rem 0 0;
+    font-size: 0.75rem;
+    color: var(--color-muted);
+  }
+
+  /* ── Layout variants — position/alignment only, not a redesign ── */
+
+  .layout-centered .content {
+    text-align: center;
+  }
+
+  .layout-left-aligned .content {
+    text-align: left;
+  }
+
+  /* split: hero image right / copy left at desktop, stacked at mobile.
+     Only this variant turns .page-shell into a grid — centered and
+     left-aligned stay a plain block flow (image banner above content,
+     same as before presets existed). */
+  .layout-split .content {
+    text-align: left;
+    margin-inline: 0;
+  }
+  @media (min-width: 768px) {
+    .layout-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .layout-split .hero-image-wrapper {
+      order: 2;
+      height: 100%;
+      max-height: none;
+    }
+    .layout-split .hero-image {
+      max-height: none;
+    }
+    .layout-split .content {
+      order: 1;
+      padding: 4rem;
+      max-width: none;
+    }
   }
 </style>

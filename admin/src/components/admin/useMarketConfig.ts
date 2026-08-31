@@ -13,6 +13,8 @@ export interface MarketConfig {
   // Phase 6 — set via MediaLibrary's "Set as hero" action, which reuses
   // this same hook/save path rather than a bespoke fetch.
   heroImageUrl?: string
+  // Phase 8 — set via PresetsPanel's "Save preset" action, same reuse.
+  stylePreset?: string
   updatedAt: string
   updatedBy: string
   // Set only by a rollback (see VersionHistoryPanel) — mirrors
@@ -29,6 +31,7 @@ export type MarketConfigField =
   | 'aiEnabled'
   | 'emailNotifications'
   | 'heroImageUrl'
+  | 'stylePreset'
 
 const EDITABLE_FIELDS: MarketConfigField[] = [
   'headline',
@@ -39,6 +42,7 @@ const EDITABLE_FIELDS: MarketConfigField[] = [
   'aiEnabled',
   'emailNotifications',
   'heroImageUrl',
+  'stylePreset',
 ]
 
 type EditablePatch = Pick<MarketConfig, MarketConfigField>

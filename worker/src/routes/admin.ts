@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { Env, JwtPayload } from '../types'
 import { requireSuperAdmin } from '../middleware/requireAuth'
 import { signJwt, ADMIN_TOKEN_TTL_SECONDS } from '../lib/auth'
+import { COPY_TEMPLATES } from '../lib/copyTemplates'
 
 // ── Phase 3 Part 1 — Admin panel: market copy config ─────────────────────────
 //
@@ -59,6 +60,10 @@ export interface MarketConfig {
   // Phase 6 — set via the Media Library's "Set as hero" action, which just
   // PUTs here like any other field; no separate endpoint for it.
   heroImageUrl?: string
+  // Phase 8 — preset id from worker/src/lib/presets.ts. Absent means
+  // 'classic'; resolved by astro/src/lib/presets.ts's getPreset() at SSR
+  // time, not stored as a default here.
+  stylePreset?: string
   updatedAt: string
   updatedBy: string
   // Set only by POST /config/:market/rollback (Phase 3 Part 2) — the
@@ -80,12 +85,21 @@ type MarketConfigPatch = Partial<
     | 'aiEnabled'
     | 'emailNotifications'
     | 'heroImageUrl'
+    | 'stylePreset'
   >
 >
 
 const MARKETS_INDEX_KEY = 'markets:index'
 const configKey = (market: string) => `config:${market}`
 const versionPrefix = (market: string) => `versions:${market}:`
+
+// GET /api/admin/copy-templates — static, no D1/KV read at all. Lives
+// alongside the config routes rather than its own file: one tiny
+// single-purpose GET didn't earn a dedicated route module the way
+// users/media/analytics did.
+admin.get('/copy-templates', async (c) => {
+  return c.json({ templates: COPY_TEMPLATES })
+})
 
 // GET /api/admin/markets
 admin.get('/markets', async (c) => {
@@ -123,6 +137,7 @@ admin.put('/config/:market', async (c) => {
   if (typeof body.aiEnabled === 'boolean') patch.aiEnabled = body.aiEnabled
   if (typeof body.emailNotifications === 'boolean') patch.emailNotifications = body.emailNotifications
   if (typeof body.heroImageUrl === 'string') patch.heroImageUrl = body.heroImageUrl
+  if (typeof body.stylePreset === 'string') patch.stylePreset = body.stylePreset
 
   const existing = (await c.env.KV.get<MarketConfig>(configKey(market), 'json')) ?? {}
   const jwt = c.get('jwtPayload')

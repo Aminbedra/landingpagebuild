@@ -3,10 +3,19 @@ import { useMarketConfig } from './useMarketConfig'
 import AIToggle from './AIToggle'
 import SaveBar from './SaveBar'
 import VersionHistoryPanel from './VersionHistoryPanel'
+import type { CopyTemplate } from './useCopyTemplates'
 
 interface CopyEditorProps {
   market: string
   onDirtyChange?: (dirty: boolean) => void
+  // Phase 8 — set by PresetsPanel's "Use this template" action (via
+  // AdminApp) when it navigates here. Applied once the market's config
+  // has loaded, then cleared via onTemplateConsumed — this only ever
+  // touches local draft state (setField, not saveConfig), so the form
+  // comes up dirty and nothing is written until the user hits Save
+  // themselves, same as any other edit.
+  pendingTemplate?: CopyTemplate | null
+  onTemplateConsumed?: () => void
 }
 
 const LIMITS = { headline: 80, subheadline: 120, ctaText: 40 }
@@ -15,7 +24,7 @@ const BODY_WARN_LENGTH = 500
 const inputClass =
   'w-full rounded border border-gray-700 bg-gray-800 px-3 py-2 text-gray-100 outline-none focus:border-indigo-500'
 
-export default function CopyEditor({ market, onDirtyChange }: CopyEditorProps) {
+export default function CopyEditor({ market, onDirtyChange, pendingTemplate, onTemplateConsumed }: CopyEditorProps) {
   const { config, loading, saving, error, isDirty, fetchConfig, setField, saveConfig, reset, applyRestoredConfig } =
     useMarketConfig(market)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -23,6 +32,19 @@ export default function CopyEditor({ market, onDirtyChange }: CopyEditorProps) {
   useEffect(() => {
     onDirtyChange?.(isDirty)
   }, [isDirty, onDirtyChange])
+
+  useEffect(() => {
+    if (loading || !config || !pendingTemplate) return
+    setField('headline', pendingTemplate.headline)
+    setField('subheadline', pendingTemplate.subheadline)
+    setField('body', pendingTemplate.body)
+    setField('ctaText', pendingTemplate.ctaText)
+    onTemplateConsumed?.()
+    // Deliberately not depending on `config`/`setField` — this should
+    // fire exactly once per pendingTemplate, not re-fire on every draft
+    // change it itself causes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, pendingTemplate])
 
   if (loading) {
     return (
