@@ -3,6 +3,7 @@ import AdminLayout from './AdminLayout'
 import CopyEditor from './CopyEditor'
 import LoginGate from './LoginGate'
 import { useAdminSession } from './useAdminSession'
+import { useIdleSessionRefresh } from './useIdleSessionRefresh'
 import { clearSession } from '../../lib/adminAuth'
 
 function readMarketFromUrl(): string | null {
@@ -14,6 +15,7 @@ function readMarketFromUrl(): string | null {
 
 export default function AdminApp() {
   const { token, user } = useAdminSession()
+  useIdleSessionRefresh(Boolean(token))
   const [markets, setMarkets] = useState<string[]>([])
   const [selectedMarket, setSelectedMarket] = useState<string | null>(() => readMarketFromUrl())
   const [dirtyMarket, setDirtyMarket] = useState<string | null>(null)

@@ -1,10 +1,16 @@
-import type { JwtPayload } from '../types'
+import type { Env, JwtPayload, UserRole } from '../types'
 
 // Think of JWT like a sealed envelope — anyone can read the address (payload)
 // but only the post office (server with the secret) can verify the seal is real.
 
 const ALGORITHM = { name: 'HMAC', hash: 'SHA-256' }
-const EXPIRY_SECONDS = 60 * 60 * 24 * 7 // 7 days
+const DEFAULT_EXPIRY_SECONDS = 60 * 60 * 24 * 7 // 7 days — general app sessions (/auth/login, /auth/register)
+
+// Admin panel tokens (/api/admin/login, /api/admin/refresh) are much
+// shorter-lived — the panel keeps a live session alive with a silent
+// refresh while it's actually in use, and lets it lapse if left idle.
+// See admin/src/components/admin/useIdleSessionRefresh.ts.
+export const ADMIN_TOKEN_TTL_SECONDS = 30 * 60 // 30 minutes
 
 function base64url(input: ArrayBuffer | string): string {
   const bytes =
@@ -36,14 +42,15 @@ async function importKey(secret: string): Promise<CryptoKey> {
 
 export async function signJwt(
   payload: Omit<JwtPayload, 'iat' | 'exp'>,
-  secret: string
+  secret: string,
+  expirySeconds: number = DEFAULT_EXPIRY_SECONDS
 ): Promise<string> {
   const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
   const body = base64url(
     JSON.stringify({
       ...payload,
       iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + EXPIRY_SECONDS,
+      exp: Math.floor(Date.now() / 1000) + expirySeconds,
     })
   )
   const key = await importKey(secret)
@@ -87,4 +94,39 @@ export function extractToken(request: Request): string | null {
   const auth = request.headers.get('Authorization')
   if (!auth?.startsWith('Bearer ')) return null
   return auth.slice(7)
+}
+
+export interface AuthenticatedUser {
+  id: string
+  email: string
+  name: string | null
+  role: UserRole
+}
+
+// Shared by /auth/login (routes/auth.ts) and /api/admin/login
+// (routes/adminAuth.ts) so the password-hashing scheme lives in one place.
+export async function verifyCredentials(
+  env: Env,
+  email: string,
+  password: string
+): Promise<AuthenticatedUser | null> {
+  const normalizedEmail = email.toLowerCase()
+
+  const user = await env.DB.prepare(
+    'SELECT id, email, name, role FROM users WHERE email = ?'
+  ).bind(normalizedEmail).first<AuthenticatedUser>()
+  if (!user) return null
+
+  const hash = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(password + normalizedEmail)
+  )
+  const passwordHash = Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+
+  const storedHash = await env.SESSIONS.get(`pw:${user.id}`)
+  if (storedHash !== passwordHash) return null
+
+  return user
 }

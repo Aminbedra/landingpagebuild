@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Env } from '../types'
-import { signJwt, verifyJwt, extractToken } from '../lib/auth'
+import { signJwt, verifyJwt, extractToken, verifyCredentials } from '../lib/auth'
 import { generateId, ok, err, now } from '../lib/utils'
 
 const auth = new Hono<{ Bindings: Env }>()
@@ -56,22 +56,8 @@ auth.post('/login', async (c) => {
     return err('Email and password are required', 400)
   }
 
-  const user = await c.env.DB.prepare(
-    'SELECT id, email, name, role FROM users WHERE email = ?'
-  ).bind(body.email.toLowerCase()).first<{ id: string; email: string; name: string | null; role: string }>()
-
+  const user = await verifyCredentials(c.env, body.email, body.password)
   if (!user) return err('Invalid credentials', 401)
-
-  const hash = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(body.password + body.email.toLowerCase())
-  )
-  const passwordHash = Array.from(new Uint8Array(hash))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('')
-
-  const storedHash = await c.env.SESSIONS.get(`pw:${user.id}`)
-  if (storedHash !== passwordHash) return err('Invalid credentials', 401)
 
   const token = await signJwt(
     { sub: user.id, email: user.email, role: user.role as 'client_admin' | 'super_admin' | 'viewer' },

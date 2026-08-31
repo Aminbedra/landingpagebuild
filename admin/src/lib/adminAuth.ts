@@ -1,11 +1,14 @@
-// Session + fetch helper for the admin panel (src/pages/admin).
+// Session + fetch helper for the admin panel.
 //
 // The admin panel's Phase 3 brief originally called for Cloudflare Access
 // JWT auth, but no Access application is provisioned for this repo. Instead
-// this reuses the Worker's existing internal auth (POST /auth/login →
-// Bearer JWT, see worker/src/routes/auth.ts) and gates the panel on
-// role === 'super_admin' (worker/src/middleware/requireAuth.ts ->
-// requireSuperAdmin, which every /api/admin/* route requires).
+// this uses the Worker's internal JWT auth, but with its own short-lived
+// token: POST /api/admin/login (worker/src/routes/adminAuth.ts) issues a
+// 30-minute token and rejects non-super_admin accounts outright, rather
+// than the general app's 7-day /auth/login token. useIdleSessionRefresh.ts
+// calls POST /api/admin/refresh to slide that 30 minutes forward while the
+// panel is actively used, and lets it lapse — session cleared, back to
+// LoginGate — if left idle.
 
 const TOKEN_KEY = 'lpb_admin_token'
 const USER_KEY = 'lpb_admin_user'
@@ -71,35 +74,50 @@ function getApiUrl(): string {
   return import.meta.env.PUBLIC_WORKER_API_URL
 }
 
-interface WorkerOk<T> {
-  success: true
-  data: T
-}
-interface WorkerErr {
-  success: false
-  error: string
-}
-type WorkerResponse<T> = WorkerOk<T> | WorkerErr
-
-// POST /auth/login — throws if credentials are wrong or the account isn't
-// a super_admin. On success, stores the session and returns the user.
+// POST /api/admin/login — throws if credentials are wrong or the account
+// isn't a super_admin (the Worker itself now enforces that; see
+// routes/adminAuth.ts). On success, stores the 30-minute session.
 export async function adminLogin(email: string, password: string): Promise<AdminUser> {
-  const res = await fetch(`${getApiUrl()}/auth/login`, {
+  const res = await fetch(`${getApiUrl()}/api/admin/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   })
-  const json = (await res.json()) as WorkerResponse<{ token: string; user: AdminUser }>
+  const json = (await res.json()) as { token: string; user: AdminUser } | { error: string }
 
-  if (!res.ok || !json.success) {
-    throw new Error(!json.success ? json.error : `Login failed (${res.status})`)
-  }
-  if (json.data.user.role !== 'super_admin') {
-    throw new Error('This account does not have admin access.')
+  if (!res.ok || !('token' in json)) {
+    throw new Error('error' in json ? json.error : `Login failed (${res.status})`)
   }
 
-  setSession(json.data.token, json.data.user)
-  return json.data.user
+  setSession(json.token, json.user)
+  return json.user
+}
+
+// POST /api/admin/refresh — slides the current session's expiry forward by
+// another 30 minutes without the user re-entering credentials. Called only
+// while useIdleSessionRefresh.ts considers the panel actively in use.
+// Returns false (and, on an outright 401, clears the session) rather than
+// throwing — a transient failure here shouldn't interrupt whatever the user
+// is doing; the next tick just tries again.
+export async function refreshSession(): Promise<boolean> {
+  const token = getToken()
+  const user = getStoredUser()
+  if (!token || !user) return false
+
+  const res = await fetch(`${getApiUrl()}/api/admin/refresh`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+
+  if (res.status === 401) {
+    clearSession()
+    return false
+  }
+  if (!res.ok) return false
+
+  const json = (await res.json()) as { token: string }
+  setSession(json.token, user)
+  return true
 }
 
 // Fetch wrapper for /api/admin/* — attaches the Bearer token and clears the

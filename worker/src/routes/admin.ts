@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import type { Env, JwtPayload } from '../types'
 import { requireSuperAdmin } from '../middleware/requireAuth'
+import { signJwt, ADMIN_TOKEN_TTL_SECONDS } from '../lib/auth'
 
 // ── Phase 3 Part 1 — Admin panel: market copy config ─────────────────────────
 //
@@ -9,6 +10,9 @@ import { requireSuperAdmin } from '../middleware/requireAuth'
 // /websites elsewhere in this Worker. See README "KV Data Architecture" for
 // the key schema. Auth: reuses the existing internal JWT (requireSuperAdmin),
 // not Cloudflare Access — no Access application is provisioned for this repo.
+// Login itself lives in routes/adminAuth.ts, a separate unprotected router —
+// everything in *this* file, refresh included, requires an already-valid
+// admin token.
 //
 // Phase 4 (not this session): add a `marketSlug` column to `websites` in D1
 // so a market can resolve to an owning website, and the Worker can derive
@@ -18,6 +22,21 @@ import { requireSuperAdmin } from '../middleware/requireAuth'
 const admin = new Hono<{ Bindings: Env; Variables: { jwtPayload: JwtPayload } }>()
 
 admin.use('*', requireSuperAdmin)
+
+// POST /api/admin/refresh — reissues a fresh 30-minute token for the
+// caller's own identity, sliding the session forward. Requires an
+// already-valid token (this route sits behind requireSuperAdmin above like
+// everything else here): it extends a live session, it can't resurrect an
+// expired one — that's the point, see useIdleSessionRefresh.ts.
+admin.post('/refresh', async (c) => {
+  const jwt = c.get('jwtPayload')
+  const token = await signJwt(
+    { sub: jwt.sub, email: jwt.email, role: jwt.role },
+    c.env.JWT_SECRET,
+    ADMIN_TOKEN_TTL_SECONDS
+  )
+  return c.json({ token })
+})
 
 export interface MarketConfig {
   market: string

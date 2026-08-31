@@ -8,6 +8,7 @@ import leadRoutes from './routes/leads'
 import versionRoutes from './routes/versions'
 import aiRoutes from './routes/ai'
 import adminRoutes from './routes/admin'
+import adminAuthRoutes from './routes/adminAuth'
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -44,6 +45,10 @@ app.route('/websites/:websiteId/leads', leadRoutes)
 app.route('/websites/:websiteId/versions', versionRoutes)
 app.route('/websites/:websiteId/ai', aiRoutes)
 app.route('/websites', websiteRoutes)
+// Same reasoning as above: adminRoutes applies requireSuperAdmin to '*', so
+// the unprotected POST /api/admin/login has to be mounted first or that
+// middleware would intercept it too.
+app.route('/api/admin', adminAuthRoutes)
 app.route('/api/admin', adminRoutes)
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
