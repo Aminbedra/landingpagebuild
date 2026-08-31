@@ -1,0 +1,21 @@
+{
+  "name": "landingpagebuild",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev --env staging",
+    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "db:migrate:prod": "wrangler d1 execute lpb-prod-db --file=./schema/schema.sql",
+    "db:migrate:staging": "wrangler d1 execute lpb-staging-db --file=./schema/schema.sql --env staging",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.4.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240909.0",
+    "typescript": "^5.5.0",
+    "wrangler": "^3.72.0"
+  }
+}
