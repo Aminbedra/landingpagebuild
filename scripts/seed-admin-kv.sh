@@ -46,6 +46,38 @@ npx wrangler kv key put "config:de" '{
   "updatedBy":"seed"
 }' "${KV_FLAGS[@]}"
 
+echo "Seeding leads:uk:1725100000000 (with AI summary) ..."
+npx wrangler kv key put "leads:uk:1725100000000" '{
+  "name":"Sarah Chen",
+  "email":"sarah.chen@globaltech.io",
+  "message":"We are expanding into the UK market and need localised landing pages for three product lines. Can you help us manage this at scale?",
+  "market":"uk",
+  "subdomain":"uk.landingpagebuild.com",
+  "submittedAt":"2026-08-31T10:00:00.000Z",
+  "aiSummary":"Visitor is a marketing manager at a mid-size tech firm. Primary challenge is multi-product, multi-market landing page management. Interested in the clone market feature and admin panel access for her team."
+}' "${KV_FLAGS[@]}"
+
+echo "Seeding leads:uk:1725110000000 (no AI summary) ..."
+npx wrangler kv key put "leads:uk:1725110000000" '{
+  "name":"Marcus Webb",
+  "email":"m.webb@infracore.co.uk",
+  "message":"Quick question — can we white-label the platform for our agency clients?",
+  "market":"uk",
+  "subdomain":"uk.landingpagebuild.com",
+  "submittedAt":"2026-08-31T12:45:00.000Z"
+}' "${KV_FLAGS[@]}"
+
+echo "Seeding leads:de:1725120000000 (with AI summary) ..."
+npx wrangler kv key put "leads:de:1725120000000" '{
+  "name":"Lena Hoffmann",
+  "email":"lena@baumhaus-digital.de",
+  "message":"Wir suchen eine Losung fur unsere deutschen Kampagnenseiten. Gibt es eine Testphase?",
+  "market":"de",
+  "subdomain":"de.landingpagebuild.com",
+  "submittedAt":"2026-08-31T15:20:00.000Z",
+  "aiSummary":"German-speaking visitor, agency context. Asked about trial/pricing. AI responded with platform overview and suggested booking a demo call."
+}' "${KV_FLAGS[@]}"
+
 echo "Done. Note: 'fr' is listed in markets:index but has no config:fr yet —"
 echo "GET /api/admin/config/fr will 404 until it's saved once from the admin panel."
 echo

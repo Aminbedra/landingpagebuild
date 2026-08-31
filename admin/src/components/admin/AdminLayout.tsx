@@ -1,10 +1,12 @@
 import { useState, type ReactNode } from 'react'
-import MarketSidebar from './MarketSidebar'
+import MarketSidebar, { type AdminView } from './MarketSidebar'
 
 interface AdminLayoutProps {
   selectedMarket: string | null
+  view: AdminView
   dirtyMarket: string | null
-  onSelectMarket: (market: string) => void
+  leadCounts: Record<string, number>
+  onNavigate: (market: string, view: AdminView) => void
   onMarketsLoaded: (markets: string[]) => void
   onCloneSuccess: (newMarket: string) => void
   userEmail: string | null
@@ -14,8 +16,10 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({
   selectedMarket,
+  view,
   dirtyMarket,
-  onSelectMarket,
+  leadCounts,
+  onNavigate,
   onMarketsLoaded,
   onCloneSuccess,
   userEmail,
@@ -24,8 +28,8 @@ export default function AdminLayout({
 }: AdminLayoutProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
-  function selectAndClose(market: string) {
-    onSelectMarket(market)
+  function navigateAndClose(market: string, nextView: AdminView) {
+    onNavigate(market, nextView)
     setMobileNavOpen(false)
   }
 
@@ -66,8 +70,10 @@ export default function AdminLayout({
         >
           <MarketSidebar
             selectedMarket={selectedMarket}
+            view={view}
             dirtyMarket={dirtyMarket}
-            onSelect={selectAndClose}
+            leadCounts={leadCounts}
+            onNavigate={navigateAndClose}
             onMarketsLoaded={onMarketsLoaded}
             onCloneSuccess={onCloneSuccess}
           />

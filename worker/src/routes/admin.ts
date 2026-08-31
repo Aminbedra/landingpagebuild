@@ -18,6 +18,19 @@ import { signJwt, ADMIN_TOKEN_TTL_SECONDS } from '../lib/auth'
 // so a market can resolve to an owning website, and the Worker can derive
 // these KV keys from that instead of a bare slug. Until then, markets are
 // standalone KV entries with no D1 relation.
+//
+// Phase 3 Part 3 — leads:{market}:{timestamp} below is a SEPARATE KV store
+// from the real, already-working lead-capture pipeline: POST
+// /websites/:websiteId/leads (routes/leads.ts) writes to D1's `leads` table
+// (keyed by website_id, with its own GET/export endpoints), and stashes an
+// unrelated denormalized copy at `lead:{websiteId}:{id}` (singular, 30-day
+// TTL) for something else entirely. Nothing in this codebase writes
+// `leads:{market}:{timestamp}` — the Part 3 brief's claim that Phase 2
+// already does is incorrect. Built here exactly as specified anyway,
+// consistent with how `config`/`versions` above are their own standalone
+// KV universe: seeded directly (scripts/seed-admin-kv.sh), read-only from
+// the Worker's side, no capture endpoint. Reconcile with the D1 leads
+// table only if/when Phase 4's marketSlug work above actually happens.
 
 const admin = new Hono<{ Bindings: Env; Variables: { jwtPayload: JwtPayload } }>()
 
@@ -246,6 +259,120 @@ admin.post('/config/:market/rollback', async (c) => {
   await c.env.KV.put(configKey(market), JSON.stringify(restored))
 
   return c.json({ success: true, config: restored })
+})
+
+// ── Phase 3 Part 3 — Leads dashboard ──────────────────────────────────────────
+
+export interface LeadRecord {
+  name: string
+  email: string
+  message: string
+  market: string
+  subdomain: string
+  submittedAt: string
+  aiSummary?: string
+}
+
+export interface Lead extends LeadRecord {
+  id: string
+}
+
+const LEAD_CSV_HEADERS = ['id', 'name', 'email', 'message', 'market', 'subdomain', 'submittedAt', 'aiSummary'] as const
+
+const leadPrefix = (market: string) => `leads:${market}:`
+
+function leadTimestamp(id: string, prefix: string): number {
+  return Number(id.slice(prefix.length))
+}
+
+async function fetchLead(kv: KVNamespace, key: string): Promise<Lead | null> {
+  const record = await kv.get<LeadRecord>(key, 'json')
+  return record ? { ...record, id: key } : null
+}
+
+function sortLeadsNewestFirst(leads: Lead[], prefix: string): Lead[] {
+  // Sort by the timestamp embedded in the KV key, not the record's own
+  // `submittedAt` — the key is what the Worker actually controlled when
+  // the lead was written; trusting a client-suppliable field for ordering
+  // would let a malformed/spoofed submittedAt jumble the list.
+  return [...leads].sort((a, b) => leadTimestamp(b.id, prefix) - leadTimestamp(a.id, prefix))
+}
+
+// KV.list() caps at 1000 keys per call regardless of whether a `limit` is
+// passed — "count everything" needs to page through cursors, or a market
+// with >1000 leads would silently get a wrong (capped) total instead of
+// just a slow one. This is the O(n) full-market walk the brief calls out
+// as acceptable-for-now-fix-in-Phase-7: correct now, slow later.
+async function countLeads(kv: KVNamespace, prefix: string): Promise<number> {
+  let count = 0
+  let cursor: string | undefined
+  for (;;) {
+    const page = await kv.list({ prefix, cursor })
+    count += page.keys.length
+    if (page.list_complete) break
+    cursor = page.cursor
+  }
+  return count
+}
+
+// GET /api/admin/leads/:market
+admin.get('/leads/:market', async (c) => {
+  const market = c.req.param('market')
+  const prefix = leadPrefix(market)
+
+  const url = new URL(c.req.url)
+  const cursorParam = url.searchParams.get('cursor') ?? undefined
+  const limitParam = parseInt(url.searchParams.get('limit') ?? '25', 10)
+  const limit = Math.min(Math.max(Number.isFinite(limitParam) ? limitParam : 25, 1), 100)
+
+  const page = await c.env.KV.list({ prefix, cursor: cursorParam, limit })
+
+  const leads = (
+    await Promise.all(page.keys.map((k) => fetchLead(c.env.KV, k.name)))
+  ).filter((l): l is Lead => l !== null)
+
+  const total = await countLeads(c.env.KV, prefix)
+
+  return c.json({
+    leads: sortLeadsNewestFirst(leads, prefix),
+    cursor: page.list_complete ? null : page.cursor,
+    total,
+  })
+})
+
+// GET /api/admin/leads/:market/export
+admin.get('/leads/:market/export', async (c) => {
+  const market = c.req.param('market')
+  const prefix = leadPrefix(market)
+
+  const keys: string[] = []
+  let cursor: string | undefined
+  for (;;) {
+    const page = await c.env.KV.list({ prefix, cursor })
+    keys.push(...page.keys.map((k) => k.name))
+    if (page.list_complete) break
+    cursor = page.cursor
+  }
+
+  const leads = sortLeadsNewestFirst(
+    (await Promise.all(keys.map((key) => fetchLead(c.env.KV, key)))).filter((l): l is Lead => l !== null),
+    prefix
+  )
+
+  const escapeCsv = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`
+  const rows = leads.map((lead) =>
+    LEAD_CSV_HEADERS.map((h) => escapeCsv((lead as unknown as Record<string, unknown>)[h])).join(',')
+  )
+  const csv = [LEAD_CSV_HEADERS.join(','), ...rows].join('\r\n')
+
+  const date = new Date().toISOString().slice(0, 10)
+  return new Response(csv, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/csv',
+      'Content-Disposition': `attachment; filename="leads-${market}-${date}.csv"`,
+    },
+  })
 })
 
 export default admin

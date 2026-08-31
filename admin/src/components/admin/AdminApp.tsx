@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout'
 import CopyEditor from './CopyEditor'
+import LeadsDashboard from './LeadsDashboard'
 import LoginGate from './LoginGate'
+import type { AdminView } from './MarketSidebar'
 import { useAdminSession } from './useAdminSession'
 import { useIdleSessionRefresh } from './useIdleSessionRefresh'
 import { clearSession } from '../../lib/adminAuth'
@@ -13,17 +15,25 @@ function readMarketFromUrl(): string | null {
   return new URLSearchParams(window.location.search).get('market')
 }
 
+function readViewFromUrl(): AdminView {
+  if (typeof window === 'undefined') return 'copy'
+  return new URLSearchParams(window.location.search).get('view') === 'leads' ? 'leads' : 'copy'
+}
+
 export default function AdminApp() {
   const { token, user } = useAdminSession()
   useIdleSessionRefresh(Boolean(token))
   const [markets, setMarkets] = useState<string[]>([])
   const [selectedMarket, setSelectedMarket] = useState<string | null>(() => readMarketFromUrl())
+  const [view, setView] = useState<AdminView>(() => readViewFromUrl())
   const [dirtyMarket, setDirtyMarket] = useState<string | null>(null)
+  const [leadCounts, setLeadCounts] = useState<Record<string, number>>({})
 
   // Keep selection in sync with browser back/forward.
   useEffect(() => {
     function handlePopState() {
       setSelectedMarket(readMarketFromUrl())
+      setView(readViewFromUrl())
     }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
@@ -32,7 +42,8 @@ export default function AdminApp() {
   // MarketSidebar owns the GET /api/admin/markets fetch; this is how the
   // root learns the list, so it can default ?market= to the first one when
   // the URL doesn't already name a market (or names one that no longer
-  // exists).
+  // exists). Leaves ?view= alone either way — a bookmarked
+  // ?market=uk&view=leads should still land on Leads once uk resolves.
   const handleMarketsLoaded = useCallback((loaded: string[]) => {
     setMarkets(loaded)
     setSelectedMarket((current) => {
@@ -46,10 +57,12 @@ export default function AdminApp() {
     })
   }, [])
 
-  const handleSelectMarket = useCallback((market: string) => {
+  const handleNavigate = useCallback((market: string, nextView: AdminView) => {
     setSelectedMarket(market)
+    setView(nextView)
     const url = new URL(window.location.href)
     url.searchParams.set('market', market)
+    url.searchParams.set('view', nextView)
     window.history.pushState({}, '', url)
   }, [])
 
@@ -63,6 +76,10 @@ export default function AdminApp() {
     [selectedMarket]
   )
 
+  const handleLeadsTotalLoaded = useCallback((market: string, total: number) => {
+    setLeadCounts((prev) => (prev[market] === total ? prev : { ...prev, [market]: total }))
+  }, [])
+
   if (!token) {
     return <LoginGate />
   }
@@ -70,21 +87,26 @@ export default function AdminApp() {
   return (
     <AdminLayout
       selectedMarket={selectedMarket}
+      view={view}
       dirtyMarket={dirtyMarket}
-      onSelectMarket={handleSelectMarket}
+      leadCounts={leadCounts}
+      onNavigate={handleNavigate}
       onMarketsLoaded={handleMarketsLoaded}
-      // Cloning a market and navigating to it are the same operation as
-      // clicking it in the sidebar once it exists — reuse handleSelectMarket
-      // rather than duplicating the URL-param bookkeeping.
-      onCloneSuccess={handleSelectMarket}
+      // Cloning creates copy content, so land on the copy editor for it —
+      // the leads view would just be empty for a brand-new market.
+      onCloneSuccess={(newMarket) => handleNavigate(newMarket, 'copy')}
       userEmail={user?.email ?? null}
       onLogout={clearSession}
     >
       {selectedMarket ? (
-        // key={selectedMarket} remounts CopyEditor (and its useMarketConfig
-        // instance) on every market switch instead of trying to reset it
-        // in-place — simpler and avoids stale-request races.
-        <CopyEditor key={selectedMarket} market={selectedMarket} onDirtyChange={handleDirtyChange} />
+        view === 'leads' ? (
+          // key remounts on market change (and here, matches CopyEditor's
+          // pattern) so useLeads' internal state doesn't leak between
+          // markets.
+          <LeadsDashboard key={`leads-${selectedMarket}`} market={selectedMarket} onTotalLoaded={handleLeadsTotalLoaded} />
+        ) : (
+          <CopyEditor key={`copy-${selectedMarket}`} market={selectedMarket} onDirtyChange={handleDirtyChange} />
+        )
       ) : (
         <div className="flex h-full items-center justify-center text-sm text-gray-400">
           {markets.length === 0 ? 'No markets configured yet.' : 'Select a market to begin.'}

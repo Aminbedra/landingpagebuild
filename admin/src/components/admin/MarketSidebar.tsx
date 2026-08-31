@@ -1,19 +1,25 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { adminFetch } from '../../lib/adminAuth'
 import CloneMarketModal from './CloneMarketModal'
 
+export type AdminView = 'copy' | 'leads'
+
 interface MarketSidebarProps {
   selectedMarket: string | null
+  view: AdminView
   dirtyMarket: string | null
-  onSelect: (market: string) => void
+  leadCounts: Record<string, number>
+  onNavigate: (market: string, view: AdminView) => void
   onMarketsLoaded: (markets: string[]) => void
   onCloneSuccess: (newMarket: string) => void
 }
 
 export default function MarketSidebar({
   selectedMarket,
+  view,
   dirtyMarket,
-  onSelect,
+  leadCounts,
+  onNavigate,
   onMarketsLoaded,
   onCloneSuccess,
 }: MarketSidebarProps) {
@@ -63,7 +69,7 @@ export default function MarketSidebar({
   return (
     <nav className="flex h-full flex-col">
       <div className="flex-1 overflow-y-auto px-3 py-4">
-        <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Markets</p>
+        <p className="mb-2 px-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">Markets</p>
 
         {loading && <p className="px-2 text-sm text-gray-500">Loading…</p>}
         {error && <p className="px-2 text-sm text-red-400">{error}</p>}
@@ -71,33 +77,44 @@ export default function MarketSidebar({
           <p className="px-2 text-sm text-gray-500">No markets yet.</p>
         )}
 
-        <ul className="space-y-1">
+        <ul className="space-y-3">
           {markets.map((market) => {
-            const active = market === selectedMarket
+            const isSelected = market === selectedMarket
+            const count = leadCounts[market]
             return (
               <li key={market} className="group relative">
-                <button
-                  type="button"
-                  onClick={() => onSelect(market)}
-                  aria-current={active ? 'page' : undefined}
-                  className={`flex w-full items-center justify-between rounded px-3 py-2 pr-8 text-left text-sm transition-colors ${
-                    active ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800'
-                  }`}
-                >
-                  <span>{market.toUpperCase()}</span>
+                <div className="flex items-center justify-between px-2 pr-7">
+                  <span className={`text-sm font-medium ${isSelected ? 'text-gray-100' : 'text-gray-400'}`}>
+                    {market.toUpperCase()}
+                  </span>
                   {dirtyMarket === market && (
                     <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400" aria-label="Unsaved changes" />
                   )}
-                </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => setCloneSource(market)}
                   title={`Clone ${market.toUpperCase()}`}
                   aria-label={`Clone ${market.toUpperCase()}`}
-                  className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-1 text-gray-500 opacity-0 transition-opacity group-hover:opacity-100 hover:text-gray-200"
+                  className="absolute top-0 right-1.5 rounded p-1 text-gray-500 opacity-0 transition-opacity group-hover:opacity-100 hover:text-gray-200"
                 >
                   <CloneIcon />
                 </button>
+
+                <div className="mt-1 space-y-0.5">
+                  <SubNavLink
+                    active={isSelected && view === 'copy'}
+                    onClick={() => onNavigate(market, 'copy')}
+                  >
+                    Copy
+                  </SubNavLink>
+                  <SubNavLink
+                    active={isSelected && view === 'leads'}
+                    onClick={() => onNavigate(market, 'leads')}
+                  >
+                    Leads{count !== undefined ? ` (${count})` : ''}
+                  </SubNavLink>
+                </div>
               </li>
             )
           })}
@@ -123,6 +140,20 @@ export default function MarketSidebar({
         onCloneSuccess={handleCloneSuccess}
       />
     </nav>
+  )
+}
+
+function SubNavLink({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`block w-full rounded-r border-l-2 px-3 py-1 text-left text-xs transition-colors ${
+        active ? 'border-indigo-500 bg-indigo-600/10 text-indigo-300' : 'border-transparent text-gray-400 hover:text-gray-200'
+      }`}
+    >
+      {children}
+    </button>
   )
 }
 
