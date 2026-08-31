@@ -11,6 +11,7 @@ import adminRoutes from './routes/admin'
 import adminAuthRoutes from './routes/adminAuth'
 import adminUsersRoutes from './routes/adminUsers'
 import mediaRoutes from './routes/media'
+import analyticsRoutes from './routes/analytics'
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -62,6 +63,9 @@ app.route('/api/admin/users', adminUsersRoutes)
 // stay reachable with zero auth (public landing-page images), so this is
 // mounted before admin.ts's blanket-protected /api/admin catch-all too.
 app.route('/api/admin/media', mediaRoutes)
+// No public sub-route here (unlike media's /serve), but mounted before
+// adminRoutes anyway for consistency with the same ordering pattern.
+app.route('/api/admin/analytics', analyticsRoutes)
 app.route('/api/admin', adminRoutes)
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────

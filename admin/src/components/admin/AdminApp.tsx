@@ -4,6 +4,7 @@ import CopyEditor from './CopyEditor'
 import LeadsDashboard from './LeadsDashboard'
 import UsersPanel from './UsersPanel'
 import MediaLibrary from './MediaLibrary'
+import AnalyticsPanel from './AnalyticsPanel'
 import LoginGate from './LoginGate'
 import type { AdminView } from './MarketSidebar'
 import { useAdminSession } from './useAdminSession'
@@ -20,7 +21,7 @@ function readMarketFromUrl(): string | null {
 function readViewFromUrl(): AdminView {
   if (typeof window === 'undefined') return 'copy'
   const v = new URLSearchParams(window.location.search).get('view')
-  return v === 'leads' || v === 'users' || v === 'media' ? v : 'copy'
+  return v === 'leads' || v === 'users' || v === 'media' || v === 'analytics' ? v : 'copy'
 }
 
 export default function AdminApp() {
@@ -112,6 +113,8 @@ export default function AdminApp() {
         <UsersPanel />
       ) : view === 'media' ? (
         <MediaLibrary />
+      ) : view === 'analytics' ? (
+        <AnalyticsPanel />
       ) : selectedMarket ? (
         view === 'leads' ? (
           // key remounts on market change (and here, matches CopyEditor's

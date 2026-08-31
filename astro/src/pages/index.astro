@@ -20,13 +20,22 @@
 // write-up delivered alongside this change.
 export const prerender = false
 
-import { env } from 'cloudflare:workers'
+import { env, waitUntil } from 'cloudflare:workers'
 import Layout from '../layouts/Layout.astro'
 import { marketFromHost, getMarketConfig } from '../lib/marketConfig'
+import { isBotRequest, recordPageview } from '../lib/analytics'
 
 const host = Astro.request.headers.get('host')
 const market = marketFromHost(host)
 const config = await getMarketConfig(env.KV, market)
+
+// Phase 7 — fire-and-forget pageview tracking. Not awaited (must never
+// delay the response), but not a bare unawaited promise either — passed
+// to waitUntil() so the Workers runtime keeps it alive after the response
+// is sent instead of being free to cancel it. See lib/analytics.ts.
+if (!isBotRequest(Astro.request.headers.get('user-agent'))) {
+  waitUntil(recordPageview(env.KV, market))
+}
 
 const headline = config?.headline ?? 'Welcome'
 const subheadline = config?.subheadline ?? ''
