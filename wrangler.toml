@@ -19,10 +19,14 @@ id = "e4a5bf2e70054fadadc41e4cdb968cd7"
 binding = "SESSIONS"
 id = "d9c3135ef13a4923ad6f3eea4eef081d"
 
-# R2 — enable R2 in Cloudflare dashboard first, then uncomment
-# [[r2_buckets]]
-# binding = "ASSETS"
-# bucket_name = "lpb-prod-assets"
+# R2 (Phase 6 — Media Library). R2 wasn't enabled on this account until
+# now (confirmed via API: 403 "Please enable R2 through the Cloudflare
+# Dashboard" — a one-time dashboard + billing step, not something any
+# tool/API can do). Bucket must exist (`wrangler r2 bucket create
+# landingpagebuild-media-production`) before this binding will resolve.
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "landingpagebuild-media-production"
 
 [vars]
 ENVIRONMENT = "production"
@@ -46,6 +50,10 @@ id = "3f5a4a30c4164a948a56cadd21c25d49"
 [[env.staging.kv_namespaces]]
 binding = "SESSIONS"
 id = "d9c3135ef13a4923ad6f3eea4eef081d"
+
+[[env.staging.r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "landingpagebuild-media-staging"
 
 [env.staging.vars]
 ENVIRONMENT = "staging"

@@ -3,6 +3,7 @@ import AdminLayout from './AdminLayout'
 import CopyEditor from './CopyEditor'
 import LeadsDashboard from './LeadsDashboard'
 import UsersPanel from './UsersPanel'
+import MediaLibrary from './MediaLibrary'
 import LoginGate from './LoginGate'
 import type { AdminView } from './MarketSidebar'
 import { useAdminSession } from './useAdminSession'
@@ -19,7 +20,7 @@ function readMarketFromUrl(): string | null {
 function readViewFromUrl(): AdminView {
   if (typeof window === 'undefined') return 'copy'
   const v = new URLSearchParams(window.location.search).get('view')
-  return v === 'leads' || v === 'users' ? v : 'copy'
+  return v === 'leads' || v === 'users' || v === 'media' ? v : 'copy'
 }
 
 export default function AdminApp() {
@@ -109,6 +110,8 @@ export default function AdminApp() {
         // Account-scoped: rendered regardless of whether a market is
         // selected, unlike the copy/leads branches below.
         <UsersPanel />
+      ) : view === 'media' ? (
+        <MediaLibrary />
       ) : selectedMarket ? (
         view === 'leads' ? (
           // key remounts on market change (and here, matches CopyEditor's

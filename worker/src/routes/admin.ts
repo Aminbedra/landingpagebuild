@@ -56,6 +56,9 @@ export interface MarketConfig {
   ctaUrl: string
   aiEnabled: boolean
   emailNotifications: boolean
+  // Phase 6 — set via the Media Library's "Set as hero" action, which just
+  // PUTs here like any other field; no separate endpoint for it.
+  heroImageUrl?: string
   updatedAt: string
   updatedBy: string
   // Set only by POST /config/:market/rollback (Phase 3 Part 2) — the
@@ -69,7 +72,14 @@ const MARKET_SLUG_RE = /^[a-z0-9-]+$/
 type MarketConfigPatch = Partial<
   Pick<
     MarketConfig,
-    'headline' | 'subheadline' | 'body' | 'ctaText' | 'ctaUrl' | 'aiEnabled' | 'emailNotifications'
+    | 'headline'
+    | 'subheadline'
+    | 'body'
+    | 'ctaText'
+    | 'ctaUrl'
+    | 'aiEnabled'
+    | 'emailNotifications'
+    | 'heroImageUrl'
   >
 >
 
@@ -112,6 +122,7 @@ admin.put('/config/:market', async (c) => {
   if (typeof body.ctaUrl === 'string') patch.ctaUrl = body.ctaUrl
   if (typeof body.aiEnabled === 'boolean') patch.aiEnabled = body.aiEnabled
   if (typeof body.emailNotifications === 'boolean') patch.emailNotifications = body.emailNotifications
+  if (typeof body.heroImageUrl === 'string') patch.heroImageUrl = body.heroImageUrl
 
   const existing = (await c.env.KV.get<MarketConfig>(configKey(market), 'json')) ?? {}
   const jwt = c.get('jwtPayload')

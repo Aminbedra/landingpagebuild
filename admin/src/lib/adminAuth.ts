@@ -70,7 +70,13 @@ export function clearSession(): void {
   notify()
 }
 
-function getApiUrl(): string {
+// Exported for the Media Library's upload (see useMedia.ts): adminFetch
+// auto-sets Content-Type: application/json whenever init.body is present,
+// which would corrupt a multipart/form-data upload (the browser needs to
+// set that header itself, boundary included) — so upload builds its own
+// XMLHttpRequest instead, which also gets it real upload-progress events
+// that fetch() doesn't expose for request bodies.
+export function getApiUrl(): string {
   return import.meta.env.PUBLIC_WORKER_API_URL
 }
 

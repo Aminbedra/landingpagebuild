@@ -15,6 +15,8 @@ export interface MarketConfig {
   ctaUrl: string
   aiEnabled: boolean
   emailNotifications: boolean
+  // Phase 6 — set via the admin panel's Media Library "Set as hero" action.
+  heroImageUrl?: string
   updatedAt: string
   updatedBy: string
   restoredFrom?: string

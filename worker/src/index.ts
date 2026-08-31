@@ -10,6 +10,7 @@ import aiRoutes from './routes/ai'
 import adminRoutes from './routes/admin'
 import adminAuthRoutes from './routes/adminAuth'
 import adminUsersRoutes from './routes/adminUsers'
+import mediaRoutes from './routes/media'
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -57,6 +58,10 @@ app.route('/api/admin', adminAuthRoutes)
 // own (identical) guard ever runs, or 404ing if admin.ts's dispatch
 // swallows the request first.
 app.route('/api/admin/users', adminUsersRoutes)
+// Same ordering reasoning again — GET /api/admin/media/serve/:key must
+// stay reachable with zero auth (public landing-page images), so this is
+// mounted before admin.ts's blanket-protected /api/admin catch-all too.
+app.route('/api/admin/media', mediaRoutes)
 app.route('/api/admin', adminRoutes)
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────

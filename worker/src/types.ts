@@ -8,8 +8,8 @@ export interface Env {
   // KV — session tokens
   SESSIONS: KVNamespace
 
-  // R2 — media assets (Phase 6, uncomment when enabled)
-  // ASSETS: R2Bucket
+  // R2 — media assets (Phase 6)
+  MEDIA_BUCKET: R2Bucket
 
   // Vars
   ENVIRONMENT: 'production' | 'staging'

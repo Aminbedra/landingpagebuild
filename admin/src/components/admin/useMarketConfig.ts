@@ -10,6 +10,9 @@ export interface MarketConfig {
   ctaUrl: string
   aiEnabled: boolean
   emailNotifications: boolean
+  // Phase 6 — set via MediaLibrary's "Set as hero" action, which reuses
+  // this same hook/save path rather than a bespoke fetch.
+  heroImageUrl?: string
   updatedAt: string
   updatedBy: string
   // Set only by a rollback (see VersionHistoryPanel) — mirrors
@@ -25,6 +28,7 @@ export type MarketConfigField =
   | 'ctaUrl'
   | 'aiEnabled'
   | 'emailNotifications'
+  | 'heroImageUrl'
 
 const EDITABLE_FIELDS: MarketConfigField[] = [
   'headline',
@@ -34,6 +38,7 @@ const EDITABLE_FIELDS: MarketConfigField[] = [
   'ctaUrl',
   'aiEnabled',
   'emailNotifications',
+  'heroImageUrl',
 ]
 
 type EditablePatch = Pick<MarketConfig, MarketConfigField>
