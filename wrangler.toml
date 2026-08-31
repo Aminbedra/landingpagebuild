@@ -9,6 +9,7 @@ compatibility_flags = ["nodejs_compat"]
 binding = "DB"
 database_name = "lpb-prod-db"
 database_id = "05b8b59e-ae13-442c-bef5-38bb3515a037"
+migrations_dir = "worker/migrations"
 
 [[kv_namespaces]]
 binding = "KV"
@@ -36,6 +37,7 @@ name = "landingpagebuild-worker-staging"
 binding = "DB"
 database_name = "lpb-staging-db"
 database_id = "98dc2329-0e0c-4fcb-9871-46a553f2131d"
+migrations_dir = "worker/migrations"
 
 [[env.staging.kv_namespaces]]
 binding = "KV"

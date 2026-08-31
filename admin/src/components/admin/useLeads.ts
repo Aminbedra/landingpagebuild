@@ -14,13 +14,15 @@ export interface Lead {
 
 interface LeadsResponse {
   leads: Lead[]
-  cursor: string | null
   total: number
+  offset: number
+  limit: number
+  hasMore: boolean
 }
 
 export function useLeads(market: string) {
   const [leads, setLeads] = useState<Lead[]>([])
-  const [cursor, setCursor] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(false)
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -35,7 +37,7 @@ export function useLeads(market: string) {
   const fetchLeads = useCallback(async () => {
     const id = ++requestId.current
     setLeads([])
-    setCursor(null)
+    setHasMore(false)
     setTotal(0)
     setLoading(true)
     setError(null)
@@ -45,7 +47,7 @@ export function useLeads(market: string) {
       const json = (await res.json()) as LeadsResponse
       if (id === requestId.current) {
         setLeads(json.leads)
-        setCursor(json.cursor)
+        setHasMore(json.hasMore)
         setTotal(json.total)
       }
     } catch (e) {
@@ -59,25 +61,28 @@ export function useLeads(market: string) {
     fetchLeads()
   }, [fetchLeads])
 
+  // D1 uses plain LIMIT/OFFSET (switched from KV's cursor pagination in
+  // the Part 3.5 D1 migration) — the next page just starts at how many
+  // rows are already loaded.
   const loadMore = useCallback(async () => {
-    if (!cursor || loadingMore) return
+    if (!hasMore || loadingMore) return
     setLoadingMore(true)
     setError(null)
     try {
       const res = await adminFetch(
-        `/api/admin/leads/${encodeURIComponent(market)}?cursor=${encodeURIComponent(cursor)}`
+        `/api/admin/leads/${encodeURIComponent(market)}?offset=${leads.length}`
       )
       if (!res.ok) throw new Error(`Failed to load more leads (${res.status})`)
       const json = (await res.json()) as LeadsResponse
       setLeads((prev) => [...prev, ...json.leads])
-      setCursor(json.cursor)
+      setHasMore(json.hasMore)
       setTotal(json.total)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load more leads')
     } finally {
       setLoadingMore(false)
     }
-  }, [market, cursor, loadingMore])
+  }, [market, leads.length, hasMore, loadingMore])
 
   const exportCsv = useCallback(async () => {
     setExporting(true)
@@ -108,7 +113,7 @@ export function useLeads(market: string) {
 
   return {
     leads,
-    cursor,
+    hasMore,
     total,
     loading,
     loadingMore,

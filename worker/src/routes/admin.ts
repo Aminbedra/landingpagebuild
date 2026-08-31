@@ -19,18 +19,14 @@ import { signJwt, ADMIN_TOKEN_TTL_SECONDS } from '../lib/auth'
 // these KV keys from that instead of a bare slug. Until then, markets are
 // standalone KV entries with no D1 relation.
 //
-// Phase 3 Part 3 — leads:{market}:{timestamp} below is a SEPARATE KV store
-// from the real, already-working lead-capture pipeline: POST
-// /websites/:websiteId/leads (routes/leads.ts) writes to D1's `leads` table
-// (keyed by website_id, with its own GET/export endpoints), and stashes an
-// unrelated denormalized copy at `lead:{websiteId}:{id}` (singular, 30-day
-// TTL) for something else entirely. Nothing in this codebase writes
-// `leads:{market}:{timestamp}` — the Part 3 brief's claim that Phase 2
-// already does is incorrect. Built here exactly as specified anyway,
-// consistent with how `config`/`versions` above are their own standalone
-// KV universe: seeded directly (scripts/seed-admin-kv.sh), read-only from
-// the Worker's side, no capture endpoint. Reconcile with the D1 leads
-// table only if/when Phase 4's marketSlug work above actually happens.
+// Phase 3 Part 3 originally built the leads dashboard below against
+// leads:{market}:{timestamp} KV keys — a standalone store, disconnected
+// from the real D1 `leads` table that POST /websites/:websiteId/leads
+// (routes/leads.ts) already wrote to. A Part 3.5 migration pass
+// (worker/migrations/0002_leads_market_schema.sql) consolidated both onto
+// that one D1 table — see the comment above the leads routes further down
+// for what changed. The KV keys from that original build are unread now
+// and left to expire naturally; nothing writes them anymore either.
 
 const admin = new Hono<{ Bindings: Env; Variables: { jwtPayload: JwtPayload } }>()
 
@@ -261,109 +257,102 @@ admin.post('/config/:market/rollback', async (c) => {
   return c.json({ success: true, config: restored })
 })
 
-// ── Phase 3 Part 3 — Leads dashboard ──────────────────────────────────────────
+// ── Phase 3 Part 3/4 — Leads dashboard ────────────────────────────────────────
+//
+// Migrated off leads:{market}:{timestamp} KV onto the D1 `leads` table (see
+// worker/migrations/0002_leads_market_schema.sql) — D1 supports the
+// email_sent/hubspot_synced flags Phase 5 needs and the aggregate queries
+// Phase 7 needs without a full-prefix KV scan. The one real lead-capture
+// path, POST /websites/:websiteId/leads (routes/leads.ts), now writes here
+// directly. Pagination switched from KV cursors to plain LIMIT/OFFSET,
+// which changes this endpoint's response shape (cursor -> offset/hasMore) —
+// see admin/src/components/admin/useLeads.ts for the matching client update.
 
-export interface LeadRecord {
+interface LeadRow {
+  id: string
+  market: string | null
+  subdomain: string | null
+  name: string | null
+  email: string | null
+  message: string | null
+  ai_summary: string | null
+  submitted_at: string | null
+  created_at: string
+}
+
+export interface Lead {
+  id: string
+  market: string
+  subdomain: string
   name: string
   email: string
   message: string
-  market: string
-  subdomain: string
   submittedAt: string
   aiSummary?: string
 }
 
-export interface Lead extends LeadRecord {
-  id: string
-}
+const LEAD_CSV_HEADERS = ['id', 'name', 'email', 'message', 'market', 'subdomain', 'submitted_at', 'ai_summary'] as const
 
-const LEAD_CSV_HEADERS = ['id', 'name', 'email', 'message', 'market', 'subdomain', 'submittedAt', 'aiSummary'] as const
-
-const leadPrefix = (market: string) => `leads:${market}:`
-
-function leadTimestamp(id: string, prefix: string): number {
-  return Number(id.slice(prefix.length))
-}
-
-async function fetchLead(kv: KVNamespace, key: string): Promise<Lead | null> {
-  const record = await kv.get<LeadRecord>(key, 'json')
-  return record ? { ...record, id: key } : null
-}
-
-function sortLeadsNewestFirst(leads: Lead[], prefix: string): Lead[] {
-  // Sort by the timestamp embedded in the KV key, not the record's own
-  // `submittedAt` — the key is what the Worker actually controlled when
-  // the lead was written; trusting a client-suppliable field for ordering
-  // would let a malformed/spoofed submittedAt jumble the list.
-  return [...leads].sort((a, b) => leadTimestamp(b.id, prefix) - leadTimestamp(a.id, prefix))
-}
-
-// KV.list() caps at 1000 keys per call regardless of whether a `limit` is
-// passed — "count everything" needs to page through cursors, or a market
-// with >1000 leads would silently get a wrong (capped) total instead of
-// just a slow one. This is the O(n) full-market walk the brief calls out
-// as acceptable-for-now-fix-in-Phase-7: correct now, slow later.
-async function countLeads(kv: KVNamespace, prefix: string): Promise<number> {
-  let count = 0
-  let cursor: string | undefined
-  for (;;) {
-    const page = await kv.list({ prefix, cursor })
-    count += page.keys.length
-    if (page.list_complete) break
-    cursor = page.cursor
+// D1 columns are snake_case; the rest of this API (MarketConfig etc.) is
+// camelCase throughout, so map here rather than let snake_case leak into
+// the response — keeps the frontend Lead shape from Part 3 unchanged.
+function toLead(row: LeadRow): Lead {
+  return {
+    id: row.id,
+    market: row.market ?? '',
+    subdomain: row.subdomain ?? '',
+    name: row.name ?? '',
+    email: row.email ?? '',
+    message: row.message ?? '',
+    submittedAt: row.submitted_at ?? row.created_at,
+    aiSummary: row.ai_summary ?? undefined,
   }
-  return count
 }
 
 // GET /api/admin/leads/:market
 admin.get('/leads/:market', async (c) => {
   const market = c.req.param('market')
-  const prefix = leadPrefix(market)
-
   const url = new URL(c.req.url)
-  const cursorParam = url.searchParams.get('cursor') ?? undefined
+
   const limitParam = parseInt(url.searchParams.get('limit') ?? '25', 10)
   const limit = Math.min(Math.max(Number.isFinite(limitParam) ? limitParam : 25, 1), 100)
+  const offsetParam = parseInt(url.searchParams.get('offset') ?? '0', 10)
+  const offset = Math.max(Number.isFinite(offsetParam) ? offsetParam : 0, 0)
 
-  const page = await c.env.KV.list({ prefix, cursor: cursorParam, limit })
+  const [rows, countRow] = await Promise.all([
+    c.env.DB.prepare('SELECT * FROM leads WHERE market = ? ORDER BY submitted_at DESC LIMIT ? OFFSET ?')
+      .bind(market, limit, offset)
+      .all<LeadRow>(),
+    c.env.DB.prepare('SELECT COUNT(*) as total FROM leads WHERE market = ?')
+      .bind(market)
+      .first<{ total: number }>(),
+  ])
 
-  const leads = (
-    await Promise.all(page.keys.map((k) => fetchLead(c.env.KV, k.name)))
-  ).filter((l): l is Lead => l !== null)
-
-  const total = await countLeads(c.env.KV, prefix)
+  const leads = rows.results.map(toLead)
+  const total = countRow?.total ?? 0
 
   return c.json({
-    leads: sortLeadsNewestFirst(leads, prefix),
-    cursor: page.list_complete ? null : page.cursor,
+    leads,
     total,
+    offset,
+    limit,
+    hasMore: offset + leads.length < total,
   })
 })
 
 // GET /api/admin/leads/:market/export
 admin.get('/leads/:market/export', async (c) => {
   const market = c.req.param('market')
-  const prefix = leadPrefix(market)
 
-  const keys: string[] = []
-  let cursor: string | undefined
-  for (;;) {
-    const page = await c.env.KV.list({ prefix, cursor })
-    keys.push(...page.keys.map((k) => k.name))
-    if (page.list_complete) break
-    cursor = page.cursor
-  }
-
-  const leads = sortLeadsNewestFirst(
-    (await Promise.all(keys.map((key) => fetchLead(c.env.KV, key)))).filter((l): l is Lead => l !== null),
-    prefix
-  )
+  const rows = await c.env.DB.prepare('SELECT * FROM leads WHERE market = ? ORDER BY submitted_at DESC')
+    .bind(market)
+    .all<LeadRow>()
 
   const escapeCsv = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`
-  const rows = leads.map((lead) =>
-    LEAD_CSV_HEADERS.map((h) => escapeCsv((lead as unknown as Record<string, unknown>)[h])).join(',')
+  const csvRows = rows.results.map((row) =>
+    LEAD_CSV_HEADERS.map((h) => escapeCsv((row as unknown as Record<string, unknown>)[h])).join(',')
   )
-  const csv = [LEAD_CSV_HEADERS.join(','), ...rows].join('\r\n')
+  const csv = [LEAD_CSV_HEADERS.join(','), ...csvRows].join('\r\n')
 
   const date = new Date().toISOString().slice(0, 10)
   return new Response(csv, {

@@ -14,7 +14,7 @@ const inputClass =
   'w-full rounded border border-gray-700 bg-gray-800 px-3 py-2 text-gray-100 outline-none focus:border-indigo-500'
 
 export default function LeadsDashboard({ market, onTotalLoaded }: LeadsDashboardProps) {
-  const { leads, cursor, total, loading, loadingMore, error, fetchLeads, loadMore, exportCsv, exporting, exportError } =
+  const { leads, hasMore, total, loading, loadingMore, error, fetchLeads, loadMore, exportCsv, exporting, exportError } =
     useLeads(market)
 
   const [search, setSearch] = useState('')
@@ -85,7 +85,7 @@ export default function LeadsDashboard({ market, onTotalLoaded }: LeadsDashboard
           <span>
             {total} total lead{total === 1 ? '' : 's'}
           </span>
-          {!loading && cursor && (
+          {!loading && hasMore && (
             <span>
               Showing {leads.length} of {total}
             </span>
@@ -169,7 +169,7 @@ export default function LeadsDashboard({ market, onTotalLoaded }: LeadsDashboard
 
             {error && leads.length > 0 && <p className="mt-3 text-center text-sm text-red-400">{error}</p>}
 
-            {cursor && (
+            {hasMore && (
               <div className="mt-4 text-center">
                 <button
                   type="button"

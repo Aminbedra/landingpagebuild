@@ -6,6 +6,33 @@ import { generateId, ok, err, now, parsePagination } from '../lib/utils'
 
 const leads = new Hono<AppContext>()
 
+// Phase 3 Part 3/4 migration: derives which market a lead came from off
+// the Host header, so every lead capture lands in one D1 table (see
+// worker/migrations/0002_leads_market_schema.sql) instead of the two
+// parallel schemas (this D1 table + a separate leads:{market}:{timestamp}
+// KV log) that existed before this pass.
+//
+// Whitelisted against the real base domain rather than blacklisting known
+// non-market hosting suffixes one at a time — an earlier version excluded
+// only *.pages.dev and missed that requests hitting the Worker directly in
+// staging arrive on *.workers.dev, which parsed as a bogus "market"
+// (caught by testing the actual deployed endpoint, not just the brief's
+// example hosts). A bare root domain, a Workers/Pages hosting hostname, or
+// anything else that isn't a real "{market}.landingpagebuild.com" has no
+// market subdomain, hence "default".
+const BASE_DOMAIN = 'landingpagebuild.com'
+
+function deriveMarketAndSubdomain(host: string | undefined): { market: string; subdomain: string } {
+  if (!host) return { market: 'default', subdomain: '' }
+  if (host === BASE_DOMAIN || !host.endsWith(`.${BASE_DOMAIN}`)) {
+    return { market: 'default', subdomain: host }
+  }
+  const prefix = host.slice(0, host.length - BASE_DOMAIN.length - 1)
+  // A nested prefix (e.g. "staging" is fine, "foo.bar" isn't a market
+  // slug) falls back to "default" too, rather than guessing.
+  return { market: prefix.includes('.') ? 'default' : prefix, subdomain: host }
+}
+
 // POST /websites/:websiteId/leads — public, no auth required
 leads.post('/', async (c) => {
   const websiteId = c.req.param('websiteId') as string
@@ -22,6 +49,7 @@ leads.post('/', async (c) => {
     message?: string
     page_id?: string
     metadata?: Record<string, unknown>
+    aiSummary?: string
   }>()
 
   if (!body.email && !body.name) return err('At least a name or email is required', 400)
@@ -29,26 +57,25 @@ leads.post('/', async (c) => {
   const id = generateId()
   const timestamp = now()
   const sourceUrl = c.req.header('Referer') ?? null
+  const { market, subdomain } = deriveMarketAndSubdomain(c.req.header('Host'))
 
   await c.env.DB.prepare(
-    `INSERT INTO leads (id, website_id, page_id, name, email, message, source_url, metadata, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO leads (id, website_id, page_id, market, subdomain, name, email, message, source_url, metadata, ai_summary, submitted_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     id, websiteId,
     body.page_id ?? null,
+    market,
+    subdomain,
     body.name ?? null,
     body.email ?? null,
     body.message ?? null,
     sourceUrl,
     body.metadata ? JSON.stringify(body.metadata) : null,
+    body.aiSummary ?? null,
+    timestamp,
     timestamp
   ).run()
-
-  await c.env.KV.put(
-    `lead:${websiteId}:${id}`,
-    JSON.stringify({ id, name: body.name, email: body.email, created_at: timestamp }),
-    { expirationTtl: 60 * 60 * 24 * 30 }
-  )
 
   // Phase 5: Resend email notification goes here
 
