@@ -1,0 +1,17 @@
+# build output
+dist/
+.astro/
+
+# deps
+node_modules/
+
+# cloudflare
+.wrangler/
+.dev.vars
+
+# NOTE: .env is intentionally NOT ignored here — it only holds PUBLIC_*
+# build-time values (the Worker API base URL), which Vite inlines into the
+# client bundle and are never secret. Keep real secrets in .dev.vars /
+# `wrangler pages secret put` instead, never in a PUBLIC_ var.
+
+.DS_Store

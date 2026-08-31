@@ -80,7 +80,7 @@ npm run deploy           # deploy to production
 ## Build Phases
 
 - [x] Phase 1 — Foundation (this file)
-- [ ] Phase 2 — Astro landing page template
+- [x] Phase 2 — Astro landing page template ([astro/](astro/README.md))
 - [ ] Phase 3 — Admin panel
 - [ ] Phase 4 — DNS subdomain routing
 - [ ] Phase 5 — Leads intelligence (Resend + HubSpot + CSV)

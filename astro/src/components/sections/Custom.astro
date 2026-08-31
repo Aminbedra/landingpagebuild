@@ -1,0 +1,13 @@
+---
+// AI-authored "custom" sections have no fixed shape and are not trusted
+// enough to render as raw HTML (no sanitizer in front of it yet), so we
+// just surface the structured content for now.
+interface Props {
+  content: Record<string, any>
+}
+const { content } = Astro.props
+---
+
+<section class="mx-auto max-w-3xl px-6 py-12">
+  <pre class="overflow-x-auto rounded-lg bg-slate-100 p-4 text-xs text-slate-600">{JSON.stringify(content, null, 2)}</pre>
+</section>

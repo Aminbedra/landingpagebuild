@@ -1,0 +1,39 @@
+---
+import Hero from './sections/Hero.astro'
+import Features from './sections/Features.astro'
+import Testimonials from './sections/Testimonials.astro'
+import CTA from './sections/CTA.astro'
+import Contact from './sections/Contact.astro'
+import FAQ from './sections/FAQ.astro'
+import Custom from './sections/Custom.astro'
+import type { PageSection } from '../lib/kv'
+
+interface Props {
+  sections: PageSection[]
+  websiteId: string
+  pageId: string
+  apiUrl: string
+}
+const { sections, websiteId, pageId, apiUrl } = Astro.props
+---
+
+{
+  sections.map((section) => {
+    switch (section.type) {
+      case 'hero':
+        return <Hero content={section.content} />
+      case 'features':
+        return <Features content={section.content} />
+      case 'testimonials':
+        return <Testimonials content={section.content} />
+      case 'cta':
+        return <CTA content={section.content} />
+      case 'contact':
+        return <Contact content={section.content} websiteId={websiteId} pageId={pageId} apiUrl={apiUrl} />
+      case 'faq':
+        return <FAQ content={section.content} />
+      default:
+        return <Custom content={section.content} />
+    }
+  })
+}

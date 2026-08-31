@@ -7,6 +7,7 @@ import pageRoutes from './routes/pages'
 import leadRoutes from './routes/leads'
 import versionRoutes from './routes/versions'
 import aiRoutes from './routes/ai'
+import adminRoutes from './routes/admin'
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -32,12 +33,18 @@ app.get('/health', (c) => {
 })
 
 // ── Routes ────────────────────────────────────────────────────────────────────
+// More specific /websites/:websiteId/* mounts must be registered before the
+// plain /websites mount: websiteRoutes applies `requireAuth` to '*', and Hono
+// runs matched handlers in registration order (not by path specificity) — so
+// mounting it first would make that middleware intercept requests meant for
+// the sub-routers, including leadRoutes' public POST /websites/:id/leads.
 app.route('/auth', authRoutes)
-app.route('/websites', websiteRoutes)
 app.route('/websites/:websiteId/pages', pageRoutes)
 app.route('/websites/:websiteId/leads', leadRoutes)
 app.route('/websites/:websiteId/versions', versionRoutes)
 app.route('/websites/:websiteId/ai', aiRoutes)
+app.route('/websites', websiteRoutes)
+app.route('/api/admin', adminRoutes)
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.notFound((c) => new Response(JSON.stringify({ success: false, error: `Route ${c.req.method} ${c.req.path} not found` }), { status: 404, headers: { 'Content-Type': 'application/json' } }))

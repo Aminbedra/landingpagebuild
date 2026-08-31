@@ -1,0 +1,32 @@
+---
+interface TestimonialItem {
+  quote?: string
+  author?: string
+  role?: string
+}
+interface Props {
+  content: Record<string, any>
+}
+const { content } = Astro.props
+const headline = content.headline ?? content.title ?? 'What people say'
+const items: TestimonialItem[] = content.items ?? []
+---
+
+<section class="bg-slate-50 py-20">
+  <div class="mx-auto max-w-6xl px-6">
+    <h2 class="text-3xl font-bold text-slate-900">{headline}</h2>
+    <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {
+        items.map((item) => (
+          <figure class="rounded-2xl bg-white p-6 shadow-sm">
+            <blockquote class="text-slate-700">&ldquo;{item.quote}&rdquo;</blockquote>
+            <figcaption class="mt-4 text-sm font-medium text-slate-900">
+              {item.author}
+              {item.role && <span class="font-normal text-slate-500"> — {item.role}</span>}
+            </figcaption>
+          </figure>
+        ))
+      }
+    </div>
+  </div>
+</section>

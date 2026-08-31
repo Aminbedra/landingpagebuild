@@ -1,0 +1,24 @@
+# LandingPageBuild.com — Astro SSR renderer (Cloudflare Pages)
+#
+# Deployed separately from the Worker API (../wrangler.toml). This project
+# only needs read access to the KV namespace that holds published page copy —
+# it never talks to D1 directly, and it calls the Worker over HTTP for
+# leads + AI chat (see PUBLIC_WORKER_API_URL in .env).
+#
+# Only the staging KV id is provisioned so far — duplicate this file's
+# binding under a `[env.production]` block once a production KV namespace
+# exists, or once page copy is served from the same KV as the Worker's
+# production namespace (e4a5bf2e70054fadadc41e4cdb968cd7).
+
+name = "landingpagebuild-astro-staging"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "3f5a4a30c4164a948a56cadd21c25d49"
+# `remote = true` + the adapter's `remoteBindings: true` (astro.config.mjs)
+# make `astro dev` read the real staging namespace instead of an empty
+# local emulation of it.
+remote = true

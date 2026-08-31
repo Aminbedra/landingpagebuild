@@ -1,0 +1,32 @@
+---
+interface FeatureItem {
+  title?: string
+  description?: string
+  icon?: string
+}
+interface Props {
+  content: Record<string, any>
+}
+const { content } = Astro.props
+const headline = content.headline ?? content.title ?? 'Features'
+const subheadline = content.subheadline ?? content.subtitle ?? ''
+const items: FeatureItem[] = content.items ?? []
+---
+
+<section class="mx-auto max-w-6xl px-6 py-20">
+  <div class="max-w-2xl">
+    <h2 class="text-3xl font-bold text-slate-900">{headline}</h2>
+    {subheadline && <p class="mt-3 text-slate-600">{subheadline}</p>}
+  </div>
+  <div class="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+    {
+      items.map((item) => (
+        <div class="rounded-2xl border border-slate-200 p-6">
+          {item.icon && <div class="mb-3 text-2xl">{item.icon}</div>}
+          <h3 class="font-semibold text-slate-900">{item.title}</h3>
+          <p class="mt-2 text-sm text-slate-600">{item.description}</p>
+        </div>
+      ))
+    }
+  </div>
+</section>

@@ -1,0 +1,21 @@
+---
+import LeadForm from '../LeadForm'
+
+interface Props {
+  content: Record<string, any>
+  websiteId: string
+  pageId: string
+  apiUrl: string
+}
+const { content, websiteId, pageId, apiUrl } = Astro.props
+const headline = content.headline ?? content.title ?? "Let's talk"
+const subheadline = content.subheadline ?? content.subtitle ?? ''
+---
+
+<section id="contact" class="mx-auto max-w-3xl px-6 py-20">
+  <h2 class="text-3xl font-bold text-slate-900">{headline}</h2>
+  {subheadline && <p class="mt-3 text-slate-600">{subheadline}</p>}
+  <div class="mt-8">
+    <LeadForm client:visible websiteId={websiteId} pageId={pageId} apiUrl={apiUrl} />
+  </div>
+</section>
