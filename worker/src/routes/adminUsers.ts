@@ -3,6 +3,25 @@ import type { Env, JwtPayload, UserRole } from '../types'
 import { requireSuperAdmin } from '../middleware/requireAuth'
 import { generateId, now } from '../lib/utils'
 import { hashPassword } from '../lib/auth'
+import { sendEmail } from '../lib/resend'
+import { buildWelcomeEmailHtml } from '../lib/emailTemplates'
+
+// Phase 5's brief describes an invite-token flow (inviteToken/inviteLink,
+// user_markets, an "accept invitation" link) that doesn't exist anywhere
+// in this codebase — checked (grep for invite_token/inviteLink/
+// user_markets: nothing) before writing this. POST /api/admin/users
+// creates the account with a password directly, set by the super_admin
+// who created it; there's no token to email. Sends a welcome/notice email
+// instead, pointing at the admin panel — never the password itself.
+const ADMIN_PANEL_URL = 'https://landingpagebuild-admin-staging.pages.dev'
+
+async function sendWelcomeEmail(env: Env, opts: { to: string; role: UserRole }): Promise<void> {
+  await sendEmail(env.RESEND_API_KEY, {
+    to: opts.to,
+    subject: 'You have been added to LandingPageBuild',
+    html: buildWelcomeEmailHtml({ role: opts.role, adminPanelUrl: ADMIN_PANEL_URL }),
+  })
+}
 
 // ── Phase 3 Part 4 — User management ──────────────────────────────────────────
 //
@@ -114,6 +133,9 @@ adminUsers.post('/', async (c) => {
 
   const passwordHash = await hashPassword(body.password, normalizedEmail)
   await c.env.SESSIONS.put(`pw:${id}`, passwordHash)
+
+  // Non-blocking — a Resend outage must not fail account creation.
+  c.executionCtx.waitUntil(sendWelcomeEmail(c.env, { to: normalizedEmail, role }))
 
   const user: UserRow = { id, email: normalizedEmail, name: body.name ?? null, role, created_at: timestamp }
   return c.json({ success: true, user }, 201)

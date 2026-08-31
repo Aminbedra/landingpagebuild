@@ -1,8 +1,11 @@
 import { Hono } from 'hono'
 
 import type { AppContext } from '../middleware/requireAuth'
+import type { Env } from '../types'
 import { requireAuth } from '../middleware/requireAuth'
 import { generateId, ok, err, now, parsePagination } from '../lib/utils'
+import { sendEmail } from '../lib/resend'
+import { buildLeadEmailHtml } from '../lib/emailTemplates'
 
 const leads = new Hono<AppContext>()
 
@@ -57,6 +60,34 @@ function deriveMarketAndSubdomain(candidateHosts: (string | undefined)[]): { mar
   return { market: 'default', subdomain: candidateHosts.find((h) => h) ?? '' }
 }
 
+// Phase 5 — fires after the D1 insert via c.executionCtx.waitUntil, so it
+// never adds latency to the visitor's response. Reads config:{market} from
+// the SAME KV binding the admin panel writes to (`KV`, not a
+// STAGING_KV/PROD_KV split that doesn't exist in this codebase — see
+// worker/src/routes/admin.ts). Only a minimal local shape is declared
+// here rather than importing admin.ts's full MarketConfig, matching how
+// other route files don't cross-import each other's KV-read types.
+async function sendLeadNotification(
+  env: Env,
+  leadId: string,
+  lead: { name: string; email: string; message: string; aiSummary?: string },
+  market: string
+): Promise<void> {
+  const config = await env.KV.get<{ emailNotifications?: boolean }>(`config:${market}`, 'json')
+  if (!config?.emailNotifications) return
+
+  const result = await sendEmail(env.RESEND_API_KEY, {
+    to: env.NOTIFICATION_TO_EMAIL,
+    replyTo: lead.email || undefined,
+    subject: `New lead — ${market.toUpperCase()} market`,
+    html: buildLeadEmailHtml(lead, market),
+  })
+
+  if (result) {
+    await env.DB.prepare('UPDATE leads SET email_sent = 1 WHERE id = ?').bind(leadId).run()
+  }
+}
+
 // POST /websites/:websiteId/leads — public, no auth required
 leads.post('/', async (c) => {
   const websiteId = c.req.param('websiteId') as string
@@ -105,7 +136,15 @@ leads.post('/', async (c) => {
     timestamp
   ).run()
 
-  // Phase 5: Resend email notification goes here
+  // Respond immediately — the notification runs after, not before.
+  c.executionCtx.waitUntil(
+    sendLeadNotification(
+      c.env,
+      id,
+      { name: body.name ?? '', email: body.email ?? '', message: body.message ?? '', aiSummary: body.aiSummary },
+      market
+    )
+  )
 
   return ok({ id, received: true }, 201)
 })

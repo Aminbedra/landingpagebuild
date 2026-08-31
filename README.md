@@ -25,9 +25,10 @@ wrangler login
 ```bash
 wrangler secret put JWT_SECRET
 wrangler secret put ANTHROPIC_API_KEY
-wrangler secret put RESEND_API_KEY        # Phase 5
-wrangler secret put STRIPE_SECRET_KEY     # Stripe pending
-wrangler secret put STRIPE_WEBHOOK_SECRET # Stripe pending
+wrangler secret put RESEND_API_KEY         # Phase 5
+wrangler secret put NOTIFICATION_TO_EMAIL  # Phase 5 — lead notification recipient
+wrangler secret put STRIPE_SECRET_KEY      # Stripe pending
+wrangler secret put STRIPE_WEBHOOK_SECRET  # Stripe pending
 ```
 
 ## Development

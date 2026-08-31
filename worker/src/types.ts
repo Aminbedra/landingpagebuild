@@ -19,6 +19,7 @@ export interface Env {
   JWT_SECRET: string
   ANTHROPIC_API_KEY: string
   RESEND_API_KEY: string       // Phase 5
+  NOTIFICATION_TO_EMAIL: string // Phase 5 — lead notification recipient
   STRIPE_SECRET_KEY: string    // Stripe integration pending
   STRIPE_WEBHOOK_SECRET: string
 }
