@@ -1,0 +1,14 @@
+# build output
+dist/
+
+# deps
+node_modules/
+
+# cloudflare
+.wrangler/
+
+# NOTE: .env is intentionally NOT ignored — it only holds the PUBLIC_
+# build-time Worker API URL (Vite inlines it into the client bundle), never
+# a secret. Mirrors ../astro/.gitignore's same rationale.
+
+.DS_Store

@@ -35,7 +35,16 @@ export function corsHeaders(origin: string): HeadersInit {
     'http://localhost:8787',
   ]
 
-  const allowedOrigin = allowed.includes(origin) ? origin : allowed[0]
+  // Admin panel (Phase 3) — plain static Vite/React app on its own
+  // Cloudflare Pages project (../../admin), separate from the exact-match
+  // list above because every `wrangler pages deploy` also gets its own
+  // preview subdomain (https://<hash>.landingpagebuild-admin-staging.pages.dev),
+  // not just the stable production one.
+  const isAdminPanelOrigin =
+    origin === 'https://landingpagebuild-admin-staging.pages.dev' ||
+    origin.endsWith('.landingpagebuild-admin-staging.pages.dev')
+
+  const allowedOrigin = allowed.includes(origin) || isAdminPanelOrigin ? origin : allowed[0]
 
   return {
     'Access-Control-Allow-Origin': allowedOrigin,

@@ -1,0 +1,21 @@
+# LandingPageBuild.com — Admin panel (Cloudflare Pages, static)
+#
+# Deliberately its own Pages project, separate from ../astro (the SSR
+# landing-page renderer) and ../wrangler.toml (the Worker API). See
+# ../astro/wrangler.toml's "KNOWN ISSUE" note and vite.config.ts here for
+# why: @astrojs/cloudflare can't cleanly deploy to Pages when any route in
+# the project needs SSR (withastro/astro#16107), and the admin panel is
+# 100% client-side anyway — no SSR, no Cloudflare bindings, just a static
+# bundle that calls the Worker API over HTTPS (see .env /
+# PUBLIC_WORKER_API_URL). Nothing here needs to bind KV directly: the
+# Worker already holds the KV binding and does all the reading/writing
+# (worker/src/routes/admin.ts) — this project only ever talks to it over
+# fetch(), the same way astro/'s ChatWidget/LeadForm islands do.
+#
+# The Worker's CORS allowlist (worker/src/lib/utils.ts) has to include this
+# project's deployed origin, or browser fetches from here to the Worker API
+# get blocked.
+
+name = "landingpagebuild-admin-staging"
+pages_build_output_dir = "dist"
+compatibility_date = "2024-09-23"
