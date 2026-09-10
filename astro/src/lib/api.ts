@@ -1,3 +1,10 @@
+// RETIRED — 2026-09
+// This file is part of the multi-tenant website builder
+// surface which has been superseded by the market-routing
+// model. Do not extend or build on this code.
+// Scheduled for deletion in a future cleanup pass.
+// See ARCHITECTURE.md for context.
+
 // Thin client for the Worker API (landingpagebuild-worker-staging). Used by
 // the React islands (ChatWidget, LeadForm) which call the Worker directly
 // from the browser — the Worker's CORS config already allows localhost:3000

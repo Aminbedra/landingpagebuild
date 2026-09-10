@@ -33,9 +33,6 @@ export type ApiResponse<T = unknown> =
 // ── Domain models ────────────────────────────────────────────────────────────
 
 export type UserRole = 'super_admin' | 'client_admin' | 'viewer'
-export type WebsiteStatus = 'draft' | 'published' | 'archived'
-export type WebsitePlan = 'free' | 'basic' | 'pro' | 'agency'
-export type SubscriptionStatus = 'active' | 'cancelled' | 'past_due' | 'trialing'
 
 export interface User {
   id: string
@@ -45,6 +42,19 @@ export interface User {
   created_at: string
   updated_at: string
 }
+
+// RETIRED — 2026-09
+// WebsiteStatus, WebsitePlan, SubscriptionStatus, and the Website/Page/
+// Lead/Version interfaces below are part of the multi-tenant website
+// builder surface's data model, superseded by the market-routing model
+// (config:{market} in KV, plus the market/subdomain columns on the live
+// `leads` D1 table). Do not extend or build on them. Scheduled for
+// deletion in a future cleanup pass. See ARCHITECTURE.md for context.
+// UserRole/User above and JwtPayload below are NOT retired — both are
+// shared with the live market-admin auth system.
+export type WebsiteStatus = 'draft' | 'published' | 'archived'
+export type WebsitePlan = 'free' | 'basic' | 'pro' | 'agency'
+export type SubscriptionStatus = 'active' | 'cancelled' | 'past_due' | 'trialing'
 
 export interface Website {
   id: string

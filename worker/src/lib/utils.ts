@@ -83,6 +83,14 @@ export function corsHeaders(origin: string): HeadersInit {
 }
 
 // ── Pagination ────────────────────────────────────────────────────────────────
+// RETIRED — 2026-09
+// parsePagination is part of the multi-tenant website builder surface
+// (used only by routes/websites.ts and routes/leads.ts) which has been
+// superseded by the market-routing model. Do not extend or build on it.
+// Scheduled for deletion in a future cleanup pass. See ARCHITECTURE.md
+// for context. The rest of this file (ok/err/generateId/now/corsHeaders)
+// is live — used by the current market-admin system and the public
+// leads/AI endpoints.
 
 export function parsePagination(url: URL): { limit: number; offset: number } {
   const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '20'), 100)

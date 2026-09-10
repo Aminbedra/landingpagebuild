@@ -1,3 +1,16 @@
+// RETIRED — 2026-09
+// This file is part of the multi-tenant website builder
+// surface which has been superseded by the market-routing
+// model. Do not extend or build on this code.
+// Scheduled for deletion in a future cleanup pass.
+// See ARCHITECTURE.md for context.
+//
+// Not to be confused with worker/src/routes/publicLeads.ts — the live,
+// market-scoped, unauthenticated lead capture endpoint. NOTE: this file's
+// POST /websites/:websiteId/leads sends a Resend notification email
+// (sendLeadNotification below) that publicLeads.ts does not yet have —
+// flagged as follow-up work, not carried over here.
+
 import { Hono } from 'hono'
 
 import type { AppContext } from '../middleware/requireAuth'

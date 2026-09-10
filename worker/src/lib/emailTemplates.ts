@@ -8,6 +8,13 @@ export function escapeHtml(str: string): string {
     .replace(/"/g, '&quot;')
 }
 
+// RETIRED — 2026-09
+// buildLeadEmailHtml is called only from routes/leads.ts (the multi-tenant
+// website builder surface, superseded by the market-routing model). Do
+// not extend or build on it. Scheduled for deletion in a future cleanup
+// pass. See ARCHITECTURE.md for context. escapeHtml above and
+// buildWelcomeEmailHtml below are NOT retired — both are live (the
+// latter used by routes/adminUsers.ts).
 export function buildLeadEmailHtml(
   lead: { name: string; email: string; message: string; aiSummary?: string },
   market: string

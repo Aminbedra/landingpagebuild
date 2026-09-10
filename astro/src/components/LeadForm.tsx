@@ -1,3 +1,13 @@
+// RETIRED — 2026-09
+// This file is part of the multi-tenant website builder
+// surface which has been superseded by the market-routing
+// model. Do not extend or build on this code.
+// Scheduled for deletion in a future cleanup pass.
+// See ARCHITECTURE.md for context.
+//
+// Not to be confused with astro/src/components/market/LeadForm.tsx — the
+// live, market-scoped replacement used by astro/src/pages/index.astro.
+
 import { useState, type SyntheticEvent } from 'react'
 import { submitLead } from '../lib/api'
 
