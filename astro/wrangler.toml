@@ -74,3 +74,56 @@ custom_domain = true
 [[routes]]
 pattern = "fr.staging.landingpagebuild.com"
 custom_domain = true
+
+# ── Production ──────────────────────────────────────────────────────────────
+# Config only — not deployed by this change. wrangler deploy --env production
+# is the command that would activate this; nothing here runs it.
+#
+# NAMING GOTCHA worth knowing before anyone runs a bare `wrangler deploy` in
+# this directory: unlike the root Worker's wrangler.toml (where the
+# unprefixed/top-level config IS production and [env.staging] is the named
+# extra environment), THIS file's top-level config is staging
+# (name = "landingpagebuild-astro-staging" above) and production only exists
+# as the named [env.production] block below. A bare `wrangler deploy` here
+# deploys staging, not production — always pass --env production explicitly
+# for this app. Not restructured to match the root Worker's convention in
+# this pass, since that's a bigger change than "add production config."
+[env.production]
+name = "landingpagebuild-astro"
+
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "e4a5bf2e70054fadadc41e4cdb968cd7"
+# Same remote-dev convenience as the staging binding above — lets
+# `wrangler dev --env production` (if anyone ever runs it) read the real
+# PROD_KV namespace instead of an empty local emulation.
+remote = true
+
+# market.landingpagebuild.com custom domains, same auto-provisioning
+# mechanism as the staging routes above (confirmed landingpagebuild.com is
+# an active zone on this account — see the staging routes' comment).
+[[env.production.routes]]
+pattern = "uk.landingpagebuild.com"
+custom_domain = true
+
+[[env.production.routes]]
+pattern = "de.landingpagebuild.com"
+custom_domain = true
+
+[[env.production.routes]]
+pattern = "fr.landingpagebuild.com"
+custom_domain = true
+
+# Root/apex domain — requested as "serves as platform homepage." Flagging
+# before this goes anywhere near a deploy: astro/src/lib/marketConfig.ts's
+# marketFromHost() has no concept of a homepage — any host that isn't a
+# recognized {market}.<base domain> (including a bare apex with no
+# subdomain at all) falls back to DEFAULT_MARKET ('uk'). Routing the apex
+# here today would not serve a distinct platform homepage; it would
+# silently serve the UK market's config:uk copy at the root domain. No
+# code change was made to fix this — it's config-only scope for this
+# pass — but deploying this specific route without addressing that first
+# would ship confusing, not missing, behavior. See STATUS.md.
+[[env.production.routes]]
+pattern = "landingpagebuild.com"
+custom_domain = true

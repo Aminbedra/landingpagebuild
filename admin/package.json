@@ -8,6 +8,8 @@
     "build": "vite build",
     "preview": "wrangler pages dev dist",
     "deploy": "vite build && wrangler pages deploy dist --project-name=landingpagebuild-admin-staging",
+    "deploy:staging": "vite build && wrangler pages deploy dist --project-name=landingpagebuild-admin-staging",
+    "deploy:production": "vite build && wrangler pages deploy dist --project-name=landingpagebuild-admin-production",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

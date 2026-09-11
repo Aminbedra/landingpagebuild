@@ -32,6 +32,14 @@ bucket_name = "landingpagebuild-media-production"
 ENVIRONMENT = "production"
 APP_URL = "https://landingpagebuild.com"
 
+# Config only — not deployed by this change. `wrangler deploy` (no --env,
+# since top-level in this file IS production) is what would activate this.
+# Same Custom Domain mechanism as the staging route below — confirmed
+# landingpagebuild.com is an active zone on this account first (dig NS).
+[[routes]]
+pattern = "api.landingpagebuild.com"
+custom_domain = true
+
 # ── Staging ──────────────────────────────────────────────────────────────────
 
 [env.staging]
