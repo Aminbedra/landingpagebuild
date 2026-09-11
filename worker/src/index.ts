@@ -12,6 +12,8 @@ import adminAuthRoutes from './routes/adminAuth'
 import adminUsersRoutes from './routes/adminUsers'
 import mediaRoutes from './routes/media'
 import analyticsRoutes from './routes/analytics'
+import publicLeadsRoutes from './routes/publicLeads'
+import publicAiRoutes from './routes/publicAi'
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -35,6 +37,16 @@ app.use('*', async (c, next) => {
 app.get('/health', (c) => {
   return c.json({ status: 'ok', environment: c.env.ENVIRONMENT, timestamp: new Date().toISOString() })
 })
+
+// ── Phase 2 (Priority 1) — public market endpoints ────────────────────────────
+// Lead capture + AI pitch widget for the live market pages
+// (astro/src/pages/index.astro). Own prefixes (/api/leads, /api/ai), no
+// overlap with anything below, so mount order relative to the rest of
+// this file doesn't matter — grouped here for visibility since they're
+// the two genuinely public, unauthenticated, visitor-facing endpoints in
+// the whole Worker.
+app.route('/api/leads', publicLeadsRoutes)
+app.route('/api/ai', publicAiRoutes)
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 // More specific /websites/:websiteId/* mounts must be registered before the

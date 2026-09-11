@@ -20,23 +20,30 @@
 // shell instead of bolting preset-awareness onto a component other pages
 // depend on staying simple.
 //
-// No LeadForm/ChatWidget island here — both require a real `websiteId`
-// (LeadForm/ChatWidget.tsx have no `aiEnabled` prop and no
-// website-optional path either), and a market has no associated website
-// record by design (see worker/src/routes/admin.ts's top-of-file note).
-// Wiring lead capture and the AI widget to markets is real, undocumented
-// scope beyond "derive market from Host and render KV config" — see the
-// write-up delivered alongside this change.
+// Phase 2 (Priority 1) — lead capture and the AI pitch widget are wired
+// here via two market-scoped React islands under components/market/,
+// calling the new public POST /api/leads/:market and POST /api/ai/:market
+// endpoints (worker/src/routes/publicLeads.ts, publicAi.ts). These are
+// deliberately NOT the top-level LeadForm.tsx/ChatWidget.tsx, which
+// belong to the retired multi-tenant builder surface and need a
+// `websiteId` a market doesn't have — see ARCHITECTURE.md "What Is
+// Retired".
 export const prerender = false
 
 import { env, waitUntil } from 'cloudflare:workers'
 import { marketFromHost, getMarketConfig } from '../lib/marketConfig'
 import { isBotRequest, recordPageview } from '../lib/analytics'
 import { getPreset } from '../lib/presets'
+import AIPitchWidget from '../components/market/AIPitchWidget'
+import LeadForm from '../components/market/LeadForm'
 
+// Market slug is derived from the request's Host header (marketFromHost),
+// never hardcoded — the same value used above to read config:{market} is
+// what's passed to both islands below.
 const host = Astro.request.headers.get('host')
 const market = marketFromHost(host)
 const config = await getMarketConfig(env.KV, market)
+const apiUrl = import.meta.env.PUBLIC_WORKER_API_URL
 
 // Phase 7 — fire-and-forget pageview tracking. Not awaited (must never
 // delay the response), but not a bare unawaited promise either — passed
@@ -131,11 +138,11 @@ const googleFontsHref = `https://fonts.googleapis.com/css2?${fontFamilies
         }
         {
           aiEnabled && (
-            <p class="ai-notice" data-ai-enabled="true">
-              AI Pitch Widget is enabled for this market (no visitor-facing widget wired up yet — see write-up).
-            </p>
+            <AIPitchWidget client:visible market={market} aiEnabled={aiEnabled} apiUrl={apiUrl} />
           )
         }
+
+        <LeadForm client:visible market={market} apiUrl={apiUrl} />
       </main>
     </div>
   </body>
@@ -217,11 +224,6 @@ const googleFontsHref = `https://fonts.googleapis.com/css2?${fontFamilies
   .placeholder-notice {
     margin: 1.5rem 0 0;
     font-size: 0.875rem;
-    color: var(--color-muted);
-  }
-  .ai-notice {
-    margin: 0.5rem 0 0;
-    font-size: 0.75rem;
     color: var(--color-muted);
   }
 
