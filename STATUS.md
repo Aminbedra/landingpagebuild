@@ -53,75 +53,94 @@ phase. Nothing else outstanding — Phase 2 has no known gaps left.
 
 ---
 
-**Phase 3 — Admin Panel: COMPLETE (staging only)**
+**Phase 3 — Admin Panel: COMPLETE — deployed to both staging and production**
 
 Copy editor, AI toggle, clone market, version history + rollback, leads
 dashboard with CSV export, user management (list/create/change role) —
 all built and wired to the Worker API. Session handling (30-minute
 tokens with silent idle refresh) works.
 
-Deployed manually to the Cloudflare Pages project
-`landingpagebuild-admin-staging` — there is no Git integration and no
-CI; `npm run deploy` from `admin/` is the only deploy path today, and it
-targets that one staging project name. No production Pages project is
-configured.
+Deployed to two Cloudflare Pages projects: `landingpagebuild-admin-staging`
+(`landingpagebuild-admin-staging.pages.dev`) and, as of this pass,
+`landingpagebuild-admin-production`
+(`landingpagebuild-admin-production.pages.dev`). Production's custom
+domain (`app.landingpagebuild.com`) is **not yet attached** — that's a
+manual Cloudflare Dashboard step, documented in `HANDOFF.md`'s "Manual
+Steps Remaining". Correction to a prior note in this file: the staging
+Pages project **does** have Git integration connected
+(`wrangler pages project list` → `Git Provider: Yes`) — pushing any
+branch auto-deploys a preview there, pushes to `main` auto-deploy
+Production. This wasn't true when earlier phases of this file were
+written. Production Pages project's Git integration status is
+unchecked.
+
+One real bug caught and fixed during the production deploy: `admin/.env`
+(the only env file this project has — no `.env.production`) still had
+`PUBLIC_WORKER_API_URL` pointing at staging when the production build
+ran. Caught before deploying (checked the built bundle, not assumed),
+fixed by temporarily pointing it at production for that one build, then
+restoring the staging default. `worker/src/lib/utils.ts`'s CORS
+allowlist also needed a second entry
+(`landingpagebuild-admin-production.pages.dev`) — the production admin
+panel would otherwise have been blocked by CORS on every API call.
+Both fixes are permanent (code-level for CORS, documented caveat for
+the env-file gap — proper fix is follow-up work, not done here).
 
 ---
 
-**Phase 4 — DNS Routing: PARTIAL — staging live, production configured but not deployed**
+**Phase 4 — DNS Routing: COMPLETE for both environments (two manual steps remaining, see HANDOFF.md)**
 
-Done (staging, verified live via curl in this project's history):
-- `astro/wrangler.toml` — Custom Domain routes for `uk/de/fr.staging.landingpagebuild.com`.
-- `wrangler.toml` (root, Worker) — Custom Domain route for
-  `api.staging.landingpagebuild.com`, `[env.staging]`.
-- `astro/.env` / `admin/.env` — `PUBLIC_WORKER_API_URL` points at
-  `api.staging.landingpagebuild.com`, not a `workers.dev` URL.
-- The typo domain (`landingpagbuild.com`) no longer has any route —
-  removed when the above staging domains were added, per
-  `ARCHITECTURE.md`'s "redirect-only, not staging" ruling. The actual
-  301 redirect rule itself is a zone-level Cloudflare action, still not
-  set up (not expressible in this repo).
+Both environments now fully live and curl-verified:
 
-Done (production — **config only, not deployed**, see `DEPLOY.md`):
-- `astro/wrangler.toml` now has an `[env.production]` block: KV bound to
-  `PROD_KV`, Custom Domain routes for `uk/de/fr.landingpagebuild.com`
-  plus the bare `landingpagebuild.com` apex. **Caveat carried over from
-  this same file's own comments**: routing the apex here does not serve
-  a distinct platform homepage — `marketFromHost()` has no homepage
-  concept, so an apex request falls back to `config:uk` and silently
-  renders the UK market's copy. Deploying that specific route today
-  ships confusing behavior, not missing behavior.
-- `wrangler.toml` (root, Worker) now has a top-level (production)
-  Custom Domain route for `api.landingpagebuild.com`.
-- `admin/package.json`, `astro/package.json`, root `package.json` —
-  `deploy:staging`/`deploy:production` scripts for all three services.
-  `DEPLOY.md` documents the full one-time setup + ordered deploy
-  commands for both environments.
+- **Staging**: `api.staging.landingpagebuild.com` (Worker),
+  `uk/de/fr.staging.landingpagebuild.com` (Astro),
+  `landingpagebuild-admin-staging.pages.dev` (admin).
+- **Production**: `api.landingpagebuild.com` (Worker),
+  `uk/de/fr.landingpagebuild.com` + the bare `landingpagebuild.com` apex
+  (Astro), `landingpagebuild-admin-production.pages.dev` (admin, no
+  custom domain yet).
 
-Still missing / not done:
-- No route for `app.landingpagebuild.com` (admin panel) in either
-  environment — the admin panel has never been reachable by a custom
-  domain, only its Pages `*.pages.dev` URL, and that's unchanged by
-  this pass.
-- **The production Worker (`landingpagebuild-worker`) does not exist on
-  Cloudflare at all** — confirmed via this session's audit
-  (`wrangler secret list` / `wrangler deployments list`, no `--env`,
-  both return "This Worker does not exist on your account" [code:
-  10007]). None of the production config above has been deployed; nothing
-  in this pass ran `wrangler deploy`.
-- The Cloudflare Pages project `landingpagebuild-admin-production`
-  doesn't exist yet — `admin/package.json`'s new `deploy:production`
-  script will fail until `wrangler pages project create
-  landingpagebuild-admin-production` is run once (documented in
-  `DEPLOY.md`, not run as part of this change).
-- No secrets are set on production (`JWT_SECRET`, `ANTHROPIC_API_KEY`,
-  `RESEND_API_KEY`, `NOTIFICATION_TO_EMAIL`) — confirmed via this
-  session's audit. Staging has all four.
-- Markets actually seeded: `uk`, `de`, `fr` (see
-  `scripts/seed-admin-kv.sh`) — not `sweden` as named in earlier
-  planning. `fr` is in `markets:index` but has no `config:fr` yet. This
-  is staging KV only — production KV (`PROD_KV`) has no market data at
-  all yet.
+The typo domain (`landingpagbuild.com`) has no route in either
+environment, per `ARCHITECTURE.md`'s "redirect-only" ruling — the actual
+301 redirect rule itself is a zone-level Cloudflare action, still not
+set up (not expressible via `wrangler`).
+
+Verified end-to-end on production during this pass: Worker health
+(`200`), all three market pages (`200` each), lead capture (`200`,
+`{"success":true,...}`, D1 write confirmed), AI pitch (`200`, real
+generated response). Two real issues were hit and fixed live, not
+assumed away:
+
+1. `wrangler deploy --env production` failed for the root Worker —
+   its `wrangler.toml` has no named `[env.production]` block (unlike
+   `astro/wrangler.toml`'s inverted structure — top-level there is
+   staging). Corrected to plain `wrangler deploy` (top-level = production
+   in that file).
+2. Production D1's `leads` table was still the original Phase-1 schema
+   — migrations `0002`/`0003` had only ever been applied to staging.
+   Applied both to `lpb-prod-db` with `--remote` (omitting it targets a
+   local emulated DB, not the real one — a second gotcha caught the
+   same way as #1) and reverified via `PRAGMA table_info(leads)` before
+   retrying the lead-capture test.
+
+Still remaining (both documented in `HANDOFF.md`'s "Manual Steps
+Remaining" — Dashboard-only, not CLI-expressible):
+- `app.landingpagebuild.com` custom domain not attached to the
+  production admin Pages project.
+- `app.staging.landingpagebuild.com` CNAME not created for staging admin.
+
+Known content gap, unchanged by this pass: the production apex
+(`landingpagebuild.com`) route is live, but `marketFromHost()` has no
+homepage concept — it currently serves the UK market's `config:uk`
+copy, not distinct platform marketing content.
+
+Markets seeded — production now has more complete data than staging:
+
+| | Staging | Production |
+|---|---|---|
+| `markets:index` | `["uk","de","fr"]` | `["uk","de","fr"]` |
+| `config:uk` / `config:de` | Set | Set |
+| `config:fr` | **Not set** (placeholder fallback renders) | Set (seeded this pass) |
 
 ---
 
@@ -183,8 +202,8 @@ UI wired to both.
 |---|---|
 | 1 — Foundation | COMPLETE |
 | 2 — Astro Landing Page | COMPLETE (staging) — fully verified, including a real AI pitch response |
-| 3 — Admin Panel | COMPLETE (staging only) |
-| 4 — DNS Routing | PARTIAL — staging live; production routes/scripts/DEPLOY.md exist but nothing deployed, production Worker doesn't exist on the account, no app. route either environment |
+| 3 — Admin Panel | COMPLETE — deployed to staging and production; production custom domain pending a manual step |
+| 4 — DNS Routing | COMPLETE for both environments — two manual DNS/Pages-domain steps remaining, see HANDOFF.md |
 | 5 — Leads Intelligence | PARTIAL — HubSpot placeholder not built |
 | 6 — Media Library | PARTIAL — R2 bucket existence unverified |
 | 7 — Analytics | COMPLETE |
