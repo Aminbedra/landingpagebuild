@@ -34,12 +34,22 @@ const EXACT_ALLOWED_ORIGINS = [
   'http://localhost:8787',
 ]
 
-// Market subdomains (Phase 4/5) — staging (landingpagbuild.com, missing
-// the second 'e' on purpose, see astro/src/lib/marketConfig.ts) and
+// Market subdomains — staging (staging.landingpagebuild.com) and
 // production (landingpagebuild.com). Regex, not a fixed list: uk/de/fr
 // today, but any market slug added later needs no CORS change.
+//
+// Priority 2, Part A, Step 3 — landingpagbuild.com (the typo domain)
+// removed: per ARCHITECTURE.md it's a 301-redirect-to-production domain
+// only now, not a market-serving one, so it no longer needs a CORS entry
+// (nothing will ever legitimately send an Origin on that domain again).
+//
+// Two separate patterns, not one that tries to make ".staging" optional —
+// a single [a-z0-9-]+ group can't match a two-label prefix like
+// "uk.staging" (no dots allowed in that character class), so
+// staging.landingpagebuild.com needs its own explicit pattern the same
+// way it needed its own entry in marketConfig.ts's BASE_DOMAINS.
 const MARKET_ORIGIN_PATTERNS = [
-  /^https:\/\/[a-z0-9-]+\.landingpagbuild\.com$/,
+  /^https:\/\/[a-z0-9-]+\.staging\.landingpagebuild\.com$/,
   /^https:\/\/[a-z0-9-]+\.landingpagebuild\.com$/,
 ]
 
