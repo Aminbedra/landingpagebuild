@@ -58,3 +58,15 @@ bucket_name = "landingpagebuild-media-staging"
 [env.staging.vars]
 ENVIRONMENT = "staging"
 APP_URL = "https://staging.landingpagebuild.com"
+
+# Priority 2, Part A, Step 4 (staging-first — see ARCHITECTURE.md and the
+# PR this landed in for why production's route isn't added yet). Same
+# Custom Domain mechanism as astro/wrangler.toml's market routes —
+# Cloudflare provisions DNS + SSL on `wrangler deploy`, confirmed
+# landingpagebuild.com is an active zone on this account first (dig NS).
+# Until this deploys, the Worker API stays reachable only at its
+# *.workers.dev URL — PUBLIC_WORKER_API_URL in astro/.env and admin/.env
+# only get switched over to this domain once it's confirmed live.
+[[env.staging.routes]]
+pattern = "api.staging.landingpagebuild.com"
+custom_domain = true

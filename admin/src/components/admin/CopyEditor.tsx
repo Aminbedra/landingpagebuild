@@ -3,6 +3,7 @@ import { useMarketConfig } from './useMarketConfig'
 import AIToggle from './AIToggle'
 import SaveBar from './SaveBar'
 import VersionHistoryPanel from './VersionHistoryPanel'
+import ExportButton from './ExportButton'
 import type { CopyTemplate } from './useCopyTemplates'
 
 interface CopyEditorProps {
@@ -90,6 +91,7 @@ export default function CopyEditor({ market, onDirtyChange, pendingTemplate, onT
               <ClockIcon />
               History
             </button>
+            <ExportButton market={market} />
           </div>
         </div>
 

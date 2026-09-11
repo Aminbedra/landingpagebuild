@@ -24,13 +24,22 @@ export interface MarketConfig {
   restoredFrom?: string
 }
 
-// "landingpagbuild.com" (missing the second 'e') is the staging domain
-// name given for this phase — kept even though nothing before this pass
-// ever referenced it (every other staging reference in this repo is
-// staging.landingpagebuild.com) and it hasn't been verified as an actual
-// zone in this Cloudflare account. See the DNS/deploy write-up delivered
-// alongside this change for why no DNS work happened yet.
-const BASE_DOMAINS = ['landingpagbuild.com', 'landingpagebuild.com']
+// Priority 2, Part A, Step 3 — landingpagbuild.com (the typo domain)
+// removed from this list. Per ARCHITECTURE.md, it's a 301-redirect-to-
+// production domain only, not a market-serving one; astro/wrangler.toml's
+// Custom Domain routes for it were removed in the same change.
+//
+// staging.landingpagebuild.com must be its own explicit entry, not
+// assumed to fall out of the bare landingpagebuild.com one below: for a
+// host like uk.staging.landingpagebuild.com, matching against
+// "landingpagebuild.com" alone would compute sub = "uk.staging" (two
+// labels), fail the single-label /^[a-z0-9-]+$/ check, and silently fall
+// back to DEFAULT_MARKET for every market except uk (uk only "worked" by
+// accident, since it happens to equal the fallback). The loop below tries
+// every base in order and only returns on a validated match, so having
+// both entries here is what makes uk.staging.* and (eventually)
+// uk.landingpagebuild.com both resolve correctly.
+const BASE_DOMAINS = ['staging.landingpagebuild.com', 'landingpagebuild.com']
 
 const DEFAULT_MARKET = 'uk'
 

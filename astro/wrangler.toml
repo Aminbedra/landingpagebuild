@@ -45,18 +45,32 @@ remote = true
 
 # Custom Domains (not Routes) — Cloudflare provisions DNS + SSL
 # automatically for these on `wrangler deploy`, no manual CNAME needed.
-# Requires an active Cloudflare zone for landingpagbuild.com in this
-# account; if the zone doesn't exist this fails cleanly at deploy time
-# rather than silently doing nothing, which is the actual test of whether
-# that domain is real (unverified as of this pass — see conversation).
+#
+# Priority 2, Part A, Step 3 — moved off landingpagbuild.com (the typo
+# domain). Per ARCHITECTURE.md's "Staging vs Production", that domain is
+# a 301-redirect-to-production domain only, not a staging environment —
+# landingpagbuild.com was only ever used here because nothing had
+# resolved the ambiguity yet (see this file's history). The real staging
+# domain is staging.landingpagebuild.com. Confirmed landingpagebuild.com
+# is an active zone on this Cloudflare account (dig NS returned
+# dom.ns.cloudflare.com/nelly.ns.cloudflare.com) before making this
+# change — staging.landingpagebuild.com itself has no DNS record yet,
+# same as uk.landingpagbuild.com had none before its first deploy;
+# Custom Domains provisions it on `wrangler deploy`, same mechanism.
+#
+# The actual 301 redirect from landingpagbuild.com to production is a
+# separate, zone-level action (a Cloudflare Redirect Rule, not anything
+# expressible in this file) — deliberately not set up in this pass, since
+# it's a production-facing action and this pass is staging-only. Its
+# Custom Domain routes are removed below rather than left dangling.
 [[routes]]
-pattern = "uk.landingpagbuild.com"
+pattern = "uk.staging.landingpagebuild.com"
 custom_domain = true
 
 [[routes]]
-pattern = "de.landingpagbuild.com"
+pattern = "de.staging.landingpagebuild.com"
 custom_domain = true
 
 [[routes]]
-pattern = "fr.landingpagbuild.com"
+pattern = "fr.staging.landingpagebuild.com"
 custom_domain = true
