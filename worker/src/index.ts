@@ -14,6 +14,7 @@ import mediaRoutes from './routes/media'
 import analyticsRoutes from './routes/analytics'
 import publicLeadsRoutes from './routes/publicLeads'
 import publicAiRoutes from './routes/publicAi'
+import exportRoutes from './routes/export'
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -47,6 +48,13 @@ app.get('/health', (c) => {
 // the whole Worker.
 app.route('/api/leads', publicLeadsRoutes)
 app.route('/api/ai', publicAiRoutes)
+
+// Priority 2 Part B — one-click site export. Admin-gated (requireSuperAdmin
+// inside export.ts itself, same as /api/admin/*), but deliberately mounted
+// at /api/export rather than nested under /api/admin — matches the path
+// the brief specified. No overlap with any other prefix, so — same as
+// leads/ai above — mount order here doesn't matter for correctness.
+app.route('/api/export', exportRoutes)
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 // RETIRED — 2026-09
