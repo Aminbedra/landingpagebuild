@@ -56,14 +56,18 @@ const MARKET_ORIGIN_PATTERNS = [
 function isAllowedOrigin(origin: string): boolean {
   if (EXACT_ALLOWED_ORIGINS.includes(origin)) return true
 
-  // Admin panel (Phase 3) — plain static Vite/React app on its own
-  // Cloudflare Pages project (../../admin), matched separately from the
-  // exact list above because every `wrangler pages deploy` also gets its
-  // own preview subdomain (https://<hash>.landingpagebuild-admin-staging.pages.dev),
-  // not just the stable production one.
+  // Admin panel (Phase 3) — plain static Vite/React app, two separate
+  // Cloudflare Pages projects (staging and production — see
+  // admin/package.json's deploy:staging/deploy:production). Matched by
+  // suffix, not the exact list above, because every `wrangler pages
+  // deploy` also gets its own preview subdomain
+  // (https://<hash>.landingpagebuild-admin-staging.pages.dev), not just
+  // the stable one — same reasoning for both projects.
   if (
+    origin.endsWith('.landingpagebuild-admin-staging.pages.dev') ||
     origin === 'https://landingpagebuild-admin-staging.pages.dev' ||
-    origin.endsWith('.landingpagebuild-admin-staging.pages.dev')
+    origin.endsWith('.landingpagebuild-admin-production.pages.dev') ||
+    origin === 'https://landingpagebuild-admin-production.pages.dev'
   ) {
     return true
   }
