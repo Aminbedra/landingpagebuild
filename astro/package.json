@@ -8,6 +8,8 @@
     "build": "astro build",
     "preview": "wrangler dev dist/server/entry.mjs --assets=dist/client --config wrangler.toml",
     "deploy": "astro build && wrangler deploy dist/server/entry.mjs --assets=dist/client --config wrangler.toml",
+    "deploy:staging": "astro build && wrangler deploy dist/server/entry.mjs --assets=dist/client --config wrangler.toml --env=\"\"",
+    "deploy:production": "astro build && wrangler deploy dist/server/entry.mjs --assets=dist/client --config wrangler.toml --env production",
     "type-check": "astro check"
   },
   "dependencies": {

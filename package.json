@@ -6,6 +6,7 @@
     "dev": "wrangler dev --env staging",
     "deploy": "wrangler deploy",
     "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy",
     "db:migrate:prod": "wrangler d1 execute lpb-prod-db --file=./schema/schema.sql",
     "db:migrate:staging": "wrangler d1 execute lpb-staging-db --file=./schema/schema.sql --env staging",
     "type-check": "tsc --noEmit"
