@@ -49,6 +49,13 @@ app.route('/api/leads', publicLeadsRoutes)
 app.route('/api/ai', publicAiRoutes)
 
 // ── Routes ────────────────────────────────────────────────────────────────────
+// RETIRED — 2026-09
+// The /auth and /websites* mounts below route to the multi-tenant website
+// builder surface, superseded by the market-routing model. Do not extend
+// or build on them. Scheduled for deletion in a future cleanup pass (this
+// file itself stays — it's the live entrypoint mounting both the retired
+// and current routers). See ARCHITECTURE.md for context.
+//
 // More specific /websites/:websiteId/* mounts must be registered before the
 // plain /websites mount: websiteRoutes applies `requireAuth` to '*', and Hono
 // runs matched handlers in registration order (not by path specificity) — so

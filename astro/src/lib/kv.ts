@@ -1,3 +1,14 @@
+// RETIRED — 2026-09
+// This file is part of the multi-tenant website builder
+// surface which has been superseded by the market-routing
+// model. Do not extend or build on this code.
+// Scheduled for deletion in a future cleanup pass.
+// See ARCHITECTURE.md for context.
+//
+// This is also the dead publish-flow itself: the `page:{subdomain}:{slug}`
+// KV shape below was never written by anything — see the comment further
+// down. Nothing to "finish" here; the whole shape is unused.
+
 // Page-copy storage convention for the Astro renderer.
 //
 // The Worker (Phase 1) keeps the source of truth for page content in D1

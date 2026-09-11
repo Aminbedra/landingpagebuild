@@ -1,3 +1,10 @@
+// RETIRED — 2026-09
+// This file is part of the multi-tenant website builder
+// surface which has been superseded by the market-routing
+// model. Do not extend or build on this code.
+// Scheduled for deletion in a future cleanup pass.
+// See ARCHITECTURE.md for context.
+
 import { Hono } from 'hono'
 import type { Env } from '../types'
 import { signJwt, verifyJwt, extractToken, verifyCredentials, hashPassword } from '../lib/auth'
