@@ -40,15 +40,16 @@ Done:
   Verified live on staging via curl and direct page fetch.
 - **AI pitch widget** — `POST /api/ai/:market` (public, no auth, gated
   by `config:{market}`'s `aiEnabled`), and a market-scoped
-  `AIPitchWidget` island. Verified live on staging: renders only where
-  `aiEnabled` is true, correctly absent where it's false. The endpoint
-  itself is gating/validating correctly, but currently 503s past those
-  checks because the Anthropic account behind `ANTHROPIC_API_KEY` is out
-  of credit (confirmed via `wrangler tail`, not a code issue) — a real
-  pitch response is unverified until that's topped up.
+  `AIPitchWidget` island. Fully verified live on staging: renders only
+  where `aiEnabled` is true, correctly absent where it's false, 403s
+  correctly when disabled, 400s correctly on a missing challenge, and —
+  now that the Anthropic account has credit — returns a real generated
+  pitch on `POST /api/ai/uk` (confirmed via curl with an actual
+  business-challenge prompt). The earlier 503 was exactly what it was
+  diagnosed as: an account-billing issue, not a code issue.
 
 Not done: the two closed gaps above were the only ones tracked for this
-phase. Nothing else outstanding.
+phase. Nothing else outstanding — Phase 2 has no known gaps left.
 
 ---
 
@@ -181,7 +182,7 @@ UI wired to both.
 | Phase | Status |
 |---|---|
 | 1 — Foundation | COMPLETE |
-| 2 — Astro Landing Page | COMPLETE (staging) — AI pitch response unverified pending Anthropic account credit |
+| 2 — Astro Landing Page | COMPLETE (staging) — fully verified, including a real AI pitch response |
 | 3 — Admin Panel | COMPLETE (staging only) |
 | 4 — DNS Routing | PARTIAL — staging live; production routes/scripts/DEPLOY.md exist but nothing deployed, production Worker doesn't exist on the account, no app. route either environment |
 | 5 — Leads Intelligence | PARTIAL — HubSpot placeholder not built |
